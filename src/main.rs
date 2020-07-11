@@ -52,6 +52,52 @@ fn absorb_path(
     }
 }
 
+#[derive(Default, Debug)]
+struct State {
+    degrees: Vec<usize>,
+    next_sigma: Vec<usize>,
+    next_on_path: Vec<usize>,
+    visited: BTreeSet<usize>,
+    pre: Vec<usize>,
+    lowpt: Vec<usize>,
+    count: usize,
+    nd: Vec<usize>,
+    outgoing_tree_edge: BTreeMap<usize, bool>,
+}
+
+impl State {
+    fn initialize(graph: &Graph) -> State {
+        let nodes: Vec<_> = graph.keys().collect();
+        let num_nodes = nodes.len();
+
+        let next_sigma = vec![0; num_nodes];
+        let next_on_path = vec![0; num_nodes];
+        let pre = vec![0; num_nodes];
+        let lowpt = vec![0; num_nodes];
+        let nd = vec![0; num_nodes];
+        let degrees = vec![0; num_nodes];
+        let visited = BTreeSet::new();
+
+        let mut outgoing_tree_edge = BTreeMap::new();
+
+        for i in 0..num_nodes {
+            outgoing_tree_edge.insert(i, true);
+        }
+
+        State {
+            next_sigma,
+            next_on_path,
+            pre,
+            lowpt,
+            nd,
+            degrees,
+            visited,
+            outgoing_tree_edge,
+            count: 1,
+        }
+    }
+}
+
 fn main() {
     let args: Vec<_> = env::args().collect();
 
