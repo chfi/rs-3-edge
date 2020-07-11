@@ -25,12 +25,12 @@ fn parse_input(path: &PathBuf) -> Graph {
 }
 
 fn absorb_path(
-    root: usize,
-    path: usize,
-    end: usize,
     degrees: &mut [usize],
     next_sigma: &mut [usize],
     next_on_path: &mut [usize],
+    root: usize,
+    path: usize,
+    end: usize,
 ) {
     let mut current = root;
     let mut path = path; // note!
@@ -62,6 +62,7 @@ struct State {
     lowpt: Vec<usize>,
     count: usize,
     nd: Vec<usize>,
+    path_u: usize,
     outgoing_tree_edge: BTreeMap<usize, bool>,
 }
 
@@ -77,12 +78,7 @@ impl State {
         let nd = vec![0; num_nodes];
         let degrees = vec![0; num_nodes];
         let visited = BTreeSet::new();
-
-        let mut outgoing_tree_edge = BTreeMap::new();
-
-        for i in 0..num_nodes {
-            outgoing_tree_edge.insert(i, true);
-        }
+        let outgoing_tree_edge = (0..num_nodes).map(|i| (i, true)).collect();
 
         State {
             next_sigma,
@@ -93,7 +89,82 @@ impl State {
             degrees,
             visited,
             outgoing_tree_edge,
+            path_u: 0,
             count: 1,
+        }
+    }
+}
+
+fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
+    state.visited.insert(w);
+    state.next_sigma[w] = w;
+    state.next_on_path[w] = w;
+    state.pre[w] = state.count;
+    state.lowpt[w] = state.count;
+    state.count += 1;
+
+    let edges = &graph[&w];
+
+    for edge in edges {
+        let u = *edge;
+        state.degrees[w] += 1;
+
+        if !state.visited.contains(&u) {
+            three_edge_connect(graph, state, u, w);
+            state.nd[w] += state.nd[u];
+
+            if state.degrees[u] <= 2 {
+                state.degrees[w] += state.degrees[u] - 2;
+                if state.next_on_path[u] == u {
+                    state.path_u = w;
+                } else {
+                    state.path_u = state.next_on_path[u];
+                }
+            } else {
+                state.path_u = u;
+            }
+
+            if state.lowpt[w] <= state.lowpt[u] {
+                absorb_path(
+                    &mut state.degrees,
+                    &mut state.next_sigma,
+                    &mut state.next_on_path,
+                    w,
+                    state.path_u,
+                    0,
+                );
+            } else {
+                state.lowpt[w] = state.lowpt[u];
+                let next_on_w = state.next_on_path[w];
+                absorb_path(
+                    &mut state.degrees,
+                    &mut state.next_sigma,
+                    &mut state.next_on_path,
+                    w,
+                    next_on_w,
+                    0,
+                );
+                state.next_on_path[w] = state.path_u;
+            }
+        } else {
+            if u == v && state.outgoing_tree_edge[&w] {
+                state.outgoing_tree_edge.insert(w, false);
+            } else if state.pre[w] > state.pre[u] {
+                let next_on_w = state.next_on_path[w];
+                if state.pre[u] < state.lowpt[w] {
+                    absorb_path(
+                        &mut state.degrees,
+                        &mut state.next_sigma,
+                        &mut state.next_on_path,
+                        w,
+                        next_on_w,
+                        0,
+                    );
+                    state.next_on_path[w] = w;
+                    state.lowpt[w] = state.pre[u];
+                }
+            } else {
+            }
         }
     }
 }
