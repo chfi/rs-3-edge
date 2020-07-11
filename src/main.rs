@@ -5,6 +5,7 @@ use std::io::BufReader;
 use std::path::PathBuf;
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 type AdjacencyList = Vec<usize>;
 
@@ -17,13 +18,38 @@ fn parse_input(path: &PathBuf) -> Graph {
         let line = line.unwrap();
         let mut fields = line.split_terminator('>');
         let node = fields.next().and_then(|f| f.parse().ok()).unwrap();
-        let mut list: AdjacencyList = Vec::new();
-        for f in fields {
-            list.push(f.parse().unwrap());
-        }
+        let list = fields.map(|f| f.parse().unwrap()).collect();
         result.insert(node, list);
     }
     result
+}
+
+fn absorb_path(
+    root: usize,
+    path: usize,
+    end: usize,
+    degrees: &mut [usize],
+    next_sigma: &mut [usize],
+    next_on_path: &mut [usize],
+) {
+    let mut current = root;
+    let mut path = path; // note!
+
+    if current != path && current != end {
+        while current != path {
+            degrees[root] += degrees[path] - 2;
+
+            next_sigma.swap(root, path);
+            // current = next_sigma[root];
+            // next_sigma[root] = next_sigma[path];
+            // next_sigma[path] = current;
+
+            current = path;
+            if path != end {
+                path = next_on_path[path];
+            }
+        }
+    }
 }
 
 fn main() {
