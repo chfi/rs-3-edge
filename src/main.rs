@@ -18,7 +18,11 @@ fn parse_input(path: &PathBuf) -> Graph {
         let line = line.unwrap();
         let mut fields = line.split_terminator('>');
         let node: usize = fields.next().and_then(|f| f.parse().ok()).unwrap();
-        let mut list: Vec<_> = fields.map(|f| f.parse().unwrap()).collect();
+        let list: Vec<_> = fields.map(|f| f.parse().unwrap()).collect();
+
+        // The original uses reversed adjacency lists, but the results
+        // should be the same
+        // list.reverse();
 
         result.insert(node, list);
     }
@@ -115,18 +119,14 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
     state.count += 1;
 
     let edges = &graph[&w];
-    // println!("edges from {}: {:?}", w, edges);
 
     for edge in edges {
-        // println!("edge: {},{}", w, edge);
         let u = *edge;
         state.degrees[w] += 1;
 
         if !state.visited.contains(&u) {
-            // println!("does not contain u");
             three_edge_connect(graph, state, u, w);
             state.nd[w] += state.nd[u];
-            println!("nd[w] = {}", state.nd[w]);
 
             if state.degrees[u] <= 2 {
                 state.degrees[w] += state.degrees[u] - 2;
@@ -144,7 +144,6 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
             }
 
             if state.lowpt[w] <= state.lowpt[u] {
-                // println!("{:?}", state.next_sigma);
                 absorb_path(
                     &mut state.degrees,
                     &mut state.next_sigma,
@@ -153,7 +152,6 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                     state.path_u,
                     0,
                 );
-            // println!("{:?}", state.next_sigma);
             } else {
                 state.lowpt[w] = state.lowpt[u];
                 let next_on_w = state.next_on_path[w];
@@ -168,7 +166,6 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                 state.next_on_path[w] = state.path_u;
             }
         } else {
-            // println!("does contain u");
             if u == v && state.outgoing_tree_edge[&w] {
                 state.outgoing_tree_edge.insert(w, false);
             } else if state.pre[w] > state.pre[u] {
@@ -238,7 +235,6 @@ fn main() {
         println!();
     }
 
-    println!("nodes: {:?}", nodes);
     for &n in nodes {
         if !state.visited.contains(&n) {
             three_edge_connect(&graph, &mut state, n, 0);
