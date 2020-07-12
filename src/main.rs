@@ -115,6 +115,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
 
             if state.degrees[u] <= 2 {
                 state.degrees[w] += state.degrees[u] - 2;
+
                 if state.next_on_path[u] == u {
                     state.path_u = w;
                 } else {
@@ -164,6 +165,36 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                     state.lowpt[w] = state.pre[u];
                 }
             } else {
+                state.degrees[w] -= 2;
+
+                if state.next_on_path[w] != w {
+                    let mut parent = w;
+                    let mut child = state.next_on_path[w];
+
+                    while parent != child
+                        && state.pre[child] <= state.pre[u]
+                        && state.pre[u] <= state.pre[child] + state.nd[child] - 1
+                    {
+                        parent = child;
+                        child = state.next_on_path[child];
+                    }
+
+                    let next_on_w = state.next_on_path[w];
+                    absorb_path(
+                        &mut state.degrees,
+                        &mut state.next_sigma,
+                        &mut state.next_on_path,
+                        w,
+                        next_on_w,
+                        parent,
+                    );
+
+                    if parent == state.next_on_path[parent] {
+                        state.next_on_path[w] = w;
+                    } else {
+                        state.next_on_path[w] = state.next_on_path[parent];
+                    }
+                }
             }
         }
     }
