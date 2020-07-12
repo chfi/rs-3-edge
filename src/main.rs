@@ -67,6 +67,7 @@ struct State {
     path_u: usize,
     outgoing_tree_edge: BTreeMap<usize, bool>,
     num_components: usize,
+    sigma: BTreeMap<usize, BTreeSet<usize>>,
 }
 
 impl State {
@@ -95,17 +96,29 @@ impl State {
             path_u: 0,
             count: 1,
             num_components: 0,
+            sigma: BTreeMap::new(),
         }
     }
 
-    fn print_sigma(&self, start: usize) {
-        print!("A 3-edge-connected component: {}", start);
+    fn sigma_path(&self, start: usize) -> Vec<usize> {
         let mut u = self.next_sigma[start];
+        let mut steps = vec![u];
         while u != start {
-            print!(", {}", u);
             u = self.next_sigma[u];
+            steps.push(u);
         }
-        println!();
+        steps
+    }
+
+    fn add_component(&mut self, start: usize) {
+        let mut u = self.next_sigma[start];
+        let mut steps = vec![u];
+        while u != start {
+            u = self.next_sigma[u];
+            steps.push(u);
+        }
+
+        self.sigma.insert(start, steps.into_iter().collect());
     }
 }
 
@@ -129,10 +142,11 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
             state.nd[w] += state.nd[u];
 
             if state.degrees[u] <= 2 {
+                println!("degrees[{}] <= 2", u);
                 state.degrees[w] += state.degrees[u] - 2;
                 state.num_components += 1;
 
-                state.print_sigma(u);
+                state.add_component(u);
 
                 if state.next_on_path[u] == u {
                     state.path_u = w;
@@ -140,10 +154,12 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                     state.path_u = state.next_on_path[u];
                 }
             } else {
+                println!("degrees[{}] > 2", u);
                 state.path_u = u;
             }
 
             if state.lowpt[w] <= state.lowpt[u] {
+                println!("lowpt[{}] <= lowpt[{}]", w, u);
                 absorb_path(
                     &mut state.degrees,
                     &mut state.next_sigma,
@@ -153,6 +169,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                     0,
                 );
             } else {
+                println!("lowpt[{}] > lowpt[{}]", w, u);
                 state.lowpt[w] = state.lowpt[u];
                 let next_on_w = state.next_on_path[w];
                 absorb_path(
@@ -169,6 +186,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
             if u == v && state.outgoing_tree_edge[&w] {
                 state.outgoing_tree_edge.insert(w, false);
             } else if state.pre[w] > state.pre[u] {
+                println!("pre[{}] > pre[{}]", w, u);
                 let next_on_w = state.next_on_path[w];
                 if state.pre[u] < state.lowpt[w] {
                     absorb_path(
@@ -183,9 +201,11 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                     state.lowpt[w] = state.pre[u];
                 }
             } else {
+                println!("pre[{}] <= pre[{}]", w, u);
                 state.degrees[w] -= 2;
 
                 if state.next_on_path[w] != w {
+                    println!("{}-path not null", w);
                     let mut parent = w;
                     let mut child = state.next_on_path[w];
 
@@ -239,9 +259,16 @@ fn main() {
         if !state.visited.contains(&n) {
             three_edge_connect(&graph, &mut state, n, 0);
             state.num_components += 1;
-            state.print_sigma(n);
+            state.add_component(n);
         }
     }
 
     println!("# of components: {}", state.num_components);
+
+    for (k, v) in state.sigma {
+        println!("start: {}", k);
+        for s in v {
+            println!("\t{}", s);
+        }
+    }
 }
