@@ -15,24 +15,6 @@ type AdjacencyList = Vec<usize>;
 
 type Graph = BTreeMap<usize, AdjacencyList>;
 
-fn parse_input(path: &PathBuf) -> Graph {
-    let file = File::open(path).unwrap();
-    let mut result = BTreeMap::new();
-    for line in BufReader::new(file).lines() {
-        let line = line.unwrap();
-        let mut fields = line.split_terminator('>');
-        let node: usize = fields.next().and_then(|f| f.parse().ok()).unwrap();
-        let list: Vec<_> = fields.map(|f| f.parse().unwrap()).collect();
-
-        // The original uses reversed adjacency lists, but the results
-        // should be the same
-        // list.reverse();
-
-        result.insert(node, list);
-    }
-    result
-}
-
 /// Constructs an adjacency list representation of the given GFA.
 /// Returns both the adjacency list and a map from GFA segment names
 /// to corresponding index in the graph.
@@ -40,16 +22,32 @@ fn gfa_adjacency_list(gfa: &GFA) -> (Graph, HashMap<String, usize>) {
     let mut result: Graph = BTreeMap::new();
     let mut name_map = HashMap::new();
 
-    for (ix, s) in gfa.segments.iter().enumerate() {
-        name_map.insert(s.name.clone(), ix + 1);
-    }
+    // for (ix, s) in gfa.segments.iter().enumerate() {
+    //     trace = ix + 1;
+    //     name_map.insert(s.name.clone(), ix + 1);
+    // }
+
+    let mut get_ix = |name: &str| {
+        if let Some(ix) = name_map.get(name) {
+            *ix
+        } else {
+            let ix = name_map.len();
+            name_map.insert(name.to_string(), ix + 1);
+            ix
+        }
+    };
 
     for link in gfa.links.iter() {
         let from = &link.from_segment;
         let to = &link.to_segment;
-        let from_ix = name_map[from];
-        let to_ix = name_map[to];
+        // let name_len = name_map.len();
 
+        let from_ix = get_ix(from);
+        let to_ix = get_ix(to);
+
+        if from != to {
+            // Some of the GFAs have identity links
+        }
         result.entry(from_ix).or_default().push(to_ix);
         result.entry(to_ix).or_default().push(from_ix);
     }
@@ -115,7 +113,7 @@ impl State {
 
                 current = step;
                 if step != end {
-                    println!("does this happen?");
+                    // println!("does this happen?");
                     step = self.next_on_path[step];
                 }
             }
@@ -149,6 +147,7 @@ impl State {
 }
 
 fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
+    println!("w = {}", w);
     state.visited.insert(w);
     state.next_sigma[w] = w;
     state.next_on_path[w] = w;
@@ -158,6 +157,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
     state.count += 1;
 
     let edges = &graph[&w];
+    println!("{:?}", edges);
 
     for edge in edges {
         let u = *edge;
@@ -168,7 +168,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
             state.nd[w] += state.nd[u];
 
             if state.degrees[u] <= 2 {
-                println!("degrees[{}] <= 2", u);
+                // println!("degrees[{}] <= 2", u);
                 state.degrees[w] += state.degrees[u] - 2;
                 state.num_components += 1;
 
@@ -180,15 +180,15 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                     state.path_u = state.next_on_path[u];
                 }
             } else {
-                println!("degrees[{}] > 2", u);
+                // println!("degrees[{}] > 2", u);
                 state.path_u = u;
             }
 
             if state.lowpt[w] <= state.lowpt[u] {
-                println!("lowpt[{}] <= lowpt[{}]", w, u);
+                // println!("lowpt[{}] <= lowpt[{}]", w, u);
                 state.absorb_path(w, state.path_u, 0);
             } else {
-                println!("lowpt[{}] > lowpt[{}]", w, u);
+                // println!("lowpt[{}] > lowpt[{}]", w, u);
                 state.lowpt[w] = state.lowpt[u];
                 state.absorb_path(w, state.next_on_path[w], 0);
                 state.next_on_path[w] = state.path_u;
@@ -196,19 +196,21 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
         } else {
             if u == v && state.outgoing_tree_edge[&w] {
                 state.outgoing_tree_edge.insert(w, false);
+            // if u == v {
             } else if state.pre[w] > state.pre[u] {
-                println!("pre[{}] > pre[{}]", w, u);
+                // } else if state.pre[w] > state.pre[u] {
+                // println!("pre[{}] > pre[{}]", w, u);
                 if state.pre[u] < state.lowpt[w] {
                     state.absorb_path(w, state.next_on_path[w], 0);
                     state.next_on_path[w] = w;
                     state.lowpt[w] = state.pre[u];
                 }
             } else {
-                println!("pre[{}] <= pre[{}]", w, u);
+                // println!("pre[{}] <= pre[{}]", w, u);
                 state.degrees[w] -= 2;
 
                 if state.next_on_path[w] != w {
-                    println!("{}-path not null", w);
+                    // println!("{}-path not null", w);
                     let mut parent = w;
                     let mut child = state.next_on_path[w];
 
@@ -236,44 +238,23 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
 fn main() {
     let args: Vec<_> = env::args().collect();
 
+    println!("wait what");
     let path = PathBuf::from(&args[1]);
 
     let gfa = parse_gfa(&path).unwrap();
+    println!("okay");
     let (graph, name_map) = gfa_adjacency_list(&gfa);
     let inv_name_map: HashMap<usize, &str> =
         name_map.iter().map(|(k, v)| (*v, k.as_str())).collect();
 
-    for (n, ix) in name_map.iter() {
-        println!("{} -> {}", n, ix);
-    }
+    println!("# segments: {}", gfa.segments.len());
+    println!("# links: {}", gfa.links.len());
+    println!("# names: {}", name_map.len());
+    println!("# nodes: {}", graph.len());
 
-    println!();
-    for (ix, n) in inv_name_map.iter() {
-        println!("{} -> {}", ix, n);
-    }
-    println!();
-
-    println!("{}", name_map.len());
-    for (k, l) in graph.iter() {
-        print!("{}", k);
-        for n in l.iter() {
-            print!(">{}", n);
-        }
-        println!();
-    }
-
-    // let graph = parse_input(&path);
     let mut state = State::initialize(&graph);
 
     let nodes: Vec<_> = graph.keys().collect();
-
-    for (k, l) in graph.iter() {
-        println!("node {}", k);
-        for n in l.iter() {
-            print!("{}>", n);
-        }
-        println!();
-    }
 
     for &n in nodes {
         if !state.visited.contains(&n) {
@@ -288,7 +269,9 @@ fn main() {
     for (_k, v) in state.sigma {
         print!("component: ");
         for s in v {
-            print!(" {}", inv_name_map[&s]);
+            if s != 0 {
+                print!(" {}", inv_name_map[&s]);
+            }
         }
 
         println!();
