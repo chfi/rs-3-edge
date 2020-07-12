@@ -29,31 +29,6 @@ fn parse_input(path: &PathBuf) -> Graph {
     result
 }
 
-fn absorb_path(
-    degrees: &mut [isize],
-    next_sigma: &mut [usize],
-    next_on_path: &mut [usize],
-    root: usize,
-    path: usize,
-    end: usize,
-) {
-    let mut current = root;
-    let mut path = path; // note!
-
-    if current != path && current != end {
-        while current != path {
-            degrees[root] += degrees[path] - 2;
-
-            next_sigma.swap(root, path);
-
-            current = path;
-            if path != end {
-                path = next_on_path[path];
-            }
-        }
-    }
-}
-
 #[derive(Default, Debug)]
 struct State {
     degrees: Vec<isize>,
@@ -100,6 +75,25 @@ impl State {
         }
     }
 
+    fn absorb_path(&mut self, root: usize, path: usize, end: usize) {
+        let mut current = root;
+        let mut step = path;
+
+        if current != step && current != end {
+            while current != step {
+                self.degrees[root] += self.degrees[step] - 2;
+
+                self.next_sigma.swap(root, step);
+
+                current = step;
+                if step != end {
+                    println!("does this happen?");
+                    step = self.next_on_path[step];
+                }
+            }
+        }
+    }
+
     fn sigma_path(&self, start: usize) -> Vec<usize> {
         let mut u = self.next_sigma[start];
         let mut steps = vec![u];
@@ -110,15 +104,19 @@ impl State {
         steps
     }
 
-    fn add_component(&mut self, start: usize) {
-        let mut u = self.next_sigma[start];
+    fn node_path(&self, start: usize) -> Vec<usize> {
+        let mut u = self.next_on_path[start];
         let mut steps = vec![u];
         while u != start {
-            u = self.next_sigma[u];
+            u = self.next_on_path[u];
             steps.push(u);
         }
+        steps
+    }
 
-        self.sigma.insert(start, steps.into_iter().collect());
+    fn add_component(&mut self, start: usize) {
+        self.sigma
+            .insert(start, self.sigma_path(start).into_iter().collect());
     }
 }
 
@@ -160,26 +158,11 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
 
             if state.lowpt[w] <= state.lowpt[u] {
                 println!("lowpt[{}] <= lowpt[{}]", w, u);
-                absorb_path(
-                    &mut state.degrees,
-                    &mut state.next_sigma,
-                    &mut state.next_on_path,
-                    w,
-                    state.path_u,
-                    0,
-                );
+                state.absorb_path(w, state.path_u, 0);
             } else {
                 println!("lowpt[{}] > lowpt[{}]", w, u);
                 state.lowpt[w] = state.lowpt[u];
-                let next_on_w = state.next_on_path[w];
-                absorb_path(
-                    &mut state.degrees,
-                    &mut state.next_sigma,
-                    &mut state.next_on_path,
-                    w,
-                    next_on_w,
-                    0,
-                );
+                state.absorb_path(w, state.next_on_path[w], 0);
                 state.next_on_path[w] = state.path_u;
             }
         } else {
@@ -187,16 +170,8 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                 state.outgoing_tree_edge.insert(w, false);
             } else if state.pre[w] > state.pre[u] {
                 println!("pre[{}] > pre[{}]", w, u);
-                let next_on_w = state.next_on_path[w];
                 if state.pre[u] < state.lowpt[w] {
-                    absorb_path(
-                        &mut state.degrees,
-                        &mut state.next_sigma,
-                        &mut state.next_on_path,
-                        w,
-                        next_on_w,
-                        0,
-                    );
+                    state.absorb_path(w, state.next_on_path[w], 0);
                     state.next_on_path[w] = w;
                     state.lowpt[w] = state.pre[u];
                 }
@@ -217,15 +192,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                         child = state.next_on_path[child];
                     }
 
-                    let next_on_w = state.next_on_path[w];
-                    absorb_path(
-                        &mut state.degrees,
-                        &mut state.next_sigma,
-                        &mut state.next_on_path,
-                        w,
-                        next_on_w,
-                        parent,
-                    );
+                    state.absorb_path(w, state.next_on_path[w], parent);
 
                     if parent == state.next_on_path[parent] {
                         state.next_on_path[w] = w;
