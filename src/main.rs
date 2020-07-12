@@ -17,15 +17,16 @@ fn parse_input(path: &PathBuf) -> Graph {
     for line in BufReader::new(file).lines() {
         let line = line.unwrap();
         let mut fields = line.split_terminator('>');
-        let node = fields.next().and_then(|f| f.parse().ok()).unwrap();
-        let list = fields.map(|f| f.parse().unwrap()).collect();
+        let node: usize = fields.next().and_then(|f| f.parse().ok()).unwrap();
+        let mut list: Vec<_> = fields.map(|f| f.parse().unwrap()).collect();
+
         result.insert(node, list);
     }
     result
 }
 
 fn absorb_path(
-    degrees: &mut [usize],
+    degrees: &mut [isize],
     next_sigma: &mut [usize],
     next_on_path: &mut [usize],
     root: usize,
@@ -40,9 +41,6 @@ fn absorb_path(
             degrees[root] += degrees[path] - 2;
 
             next_sigma.swap(root, path);
-            // current = next_sigma[root];
-            // next_sigma[root] = next_sigma[path];
-            // next_sigma[path] = current;
 
             current = path;
             if path != end {
@@ -54,7 +52,7 @@ fn absorb_path(
 
 #[derive(Default, Debug)]
 struct State {
-    degrees: Vec<usize>,
+    degrees: Vec<isize>,
     next_sigma: Vec<usize>,
     next_on_path: Vec<usize>,
     visited: BTreeSet<usize>,
@@ -64,12 +62,13 @@ struct State {
     nd: Vec<usize>,
     path_u: usize,
     outgoing_tree_edge: BTreeMap<usize, bool>,
+    num_components: usize,
 }
 
 impl State {
     fn initialize(graph: &Graph) -> State {
         let nodes: Vec<_> = graph.keys().collect();
-        let num_nodes = nodes.len();
+        let num_nodes = nodes.len() + 1;
 
         let next_sigma = vec![0; num_nodes];
         let next_on_path = vec![0; num_nodes];
@@ -91,7 +90,18 @@ impl State {
             outgoing_tree_edge,
             path_u: 0,
             count: 1,
+            num_components: 0,
         }
+    }
+
+    fn print_sigma(&self, start: usize) {
+        print!("A 3-edge-connected component: {}", start);
+        let mut u = self.next_sigma[start];
+        while u != start {
+            print!(", {}", u);
+            u = self.next_sigma[u];
+        }
+        println!();
     }
 }
 
@@ -101,20 +111,28 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
     state.next_on_path[w] = w;
     state.pre[w] = state.count;
     state.lowpt[w] = state.count;
+    state.nd[w] = 1;
     state.count += 1;
 
     let edges = &graph[&w];
+    // println!("edges from {}: {:?}", w, edges);
 
     for edge in edges {
+        // println!("edge: {},{}", w, edge);
         let u = *edge;
         state.degrees[w] += 1;
 
         if !state.visited.contains(&u) {
+            // println!("does not contain u");
             three_edge_connect(graph, state, u, w);
             state.nd[w] += state.nd[u];
+            println!("nd[w] = {}", state.nd[w]);
 
             if state.degrees[u] <= 2 {
                 state.degrees[w] += state.degrees[u] - 2;
+                state.num_components += 1;
+
+                state.print_sigma(u);
 
                 if state.next_on_path[u] == u {
                     state.path_u = w;
@@ -126,6 +144,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
             }
 
             if state.lowpt[w] <= state.lowpt[u] {
+                // println!("{:?}", state.next_sigma);
                 absorb_path(
                     &mut state.degrees,
                     &mut state.next_sigma,
@@ -134,6 +153,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                     state.path_u,
                     0,
                 );
+            // println!("{:?}", state.next_sigma);
             } else {
                 state.lowpt[w] = state.lowpt[u];
                 let next_on_w = state.next_on_path[w];
@@ -148,6 +168,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                 state.next_on_path[w] = state.path_u;
             }
         } else {
+            // println!("does contain u");
             if u == v && state.outgoing_tree_edge[&w] {
                 state.outgoing_tree_edge.insert(w, false);
             } else if state.pre[w] > state.pre[u] {
@@ -205,6 +226,10 @@ fn main() {
 
     let path = PathBuf::from(&args[1]);
     let graph = parse_input(&path);
+    let mut state = State::initialize(&graph);
+
+    let nodes: Vec<_> = graph.keys().collect();
+
     for (k, l) in graph.iter() {
         println!("node {}", k);
         for n in l.iter() {
@@ -212,4 +237,15 @@ fn main() {
         }
         println!();
     }
+
+    println!("nodes: {:?}", nodes);
+    for &n in nodes {
+        if !state.visited.contains(&n) {
+            three_edge_connect(&graph, &mut state, n, 0);
+            state.num_components += 1;
+            state.print_sigma(n);
+        }
+    }
+
+    println!("# of components: {}", state.num_components);
 }
