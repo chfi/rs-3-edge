@@ -240,9 +240,16 @@ fn main() {
 
     let gfa = parse_gfa(&path).unwrap();
     let (graph, name_map) = gfa_adjacency_list(&gfa);
+    let inv_name_map: HashMap<usize, &str> =
+        name_map.iter().map(|(k, v)| (*v, k.as_str())).collect();
 
     for (n, ix) in name_map.iter() {
         println!("{} -> {}", n, ix);
+    }
+
+    println!();
+    for (ix, n) in inv_name_map.iter() {
+        println!("{} -> {}", ix, n);
     }
     println!();
 
@@ -255,8 +262,7 @@ fn main() {
         println!();
     }
 
-    /*
-    let graph = parse_input(&path);
+    // let graph = parse_input(&path);
     let mut state = State::initialize(&graph);
 
     let nodes: Vec<_> = graph.keys().collect();
@@ -279,11 +285,12 @@ fn main() {
 
     println!("# of components: {}", state.num_components);
 
-    for (k, v) in state.sigma {
-        println!("start: {}", k);
+    for (_k, v) in state.sigma {
+        print!("component: ");
         for s in v {
-            println!("\t{}", s);
+            print!(" {}", inv_name_map[&s]);
         }
+
+        println!();
     }
-    */
 }
