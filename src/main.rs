@@ -6,6 +6,10 @@ use std::path::PathBuf;
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::collections::HashMap;
+
+use gfa::gfa::GFA;
+use gfa::parser::parse_gfa;
 
 type AdjacencyList = Vec<usize>;
 
@@ -27,6 +31,30 @@ fn parse_input(path: &PathBuf) -> Graph {
         result.insert(node, list);
     }
     result
+}
+
+/// Constructs an adjacency list representation of the given GFA.
+/// Returns both the adjacency list and a map from GFA segment names
+/// to corresponding index in the graph.
+fn gfa_adjacency_list(gfa: &GFA) -> (Graph, HashMap<String, usize>) {
+    let mut result: Graph = BTreeMap::new();
+    let mut name_map = HashMap::new();
+
+    for (ix, s) in gfa.segments.iter().enumerate() {
+        name_map.insert(s.name.clone(), ix + 1);
+    }
+
+    for link in gfa.links.iter() {
+        let from = &link.from_segment;
+        let to = &link.to_segment;
+        let from_ix = name_map[from];
+        let to_ix = name_map[to];
+
+        result.entry(from_ix).or_default().push(to_ix);
+        result.entry(to_ix).or_default().push(from_ix);
+    }
+
+    (result, name_map)
 }
 
 #[derive(Default, Debug)]
@@ -209,6 +237,25 @@ fn main() {
     let args: Vec<_> = env::args().collect();
 
     let path = PathBuf::from(&args[1]);
+
+    let gfa = parse_gfa(&path).unwrap();
+    let (graph, name_map) = gfa_adjacency_list(&gfa);
+
+    for (n, ix) in name_map.iter() {
+        println!("{} -> {}", n, ix);
+    }
+    println!();
+
+    println!("{}", name_map.len());
+    for (k, l) in graph.iter() {
+        print!("{}", k);
+        for n in l.iter() {
+            print!(">{}", n);
+        }
+        println!();
+    }
+
+    /*
     let graph = parse_input(&path);
     let mut state = State::initialize(&graph);
 
@@ -238,4 +285,5 @@ fn main() {
             println!("\t{}", s);
         }
     }
+    */
 }
