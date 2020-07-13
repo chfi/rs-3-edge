@@ -72,9 +72,9 @@ struct State {
 }
 
 impl State {
-    fn initialize(graph: &Graph) -> State {
+    fn initialize(graph: &Graph, num_nodes: usize) -> State {
         let nodes: Vec<_> = graph.keys().collect();
-        let num_nodes = nodes.len() + 1;
+        // let num_nodes = nodes.len() + 1;
 
         let next_sigma = vec![0; num_nodes];
         let next_on_path = vec![0; num_nodes];
@@ -252,7 +252,7 @@ fn main() {
     println!("# names: {}", name_map.len());
     println!("# nodes: {}", graph.len());
 
-    let mut state = State::initialize(&graph);
+    let mut state = State::initialize(&graph, gfa.segments.len() + 1);
 
     let nodes: Vec<_> = graph.keys().collect();
 
