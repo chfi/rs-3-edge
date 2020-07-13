@@ -66,7 +66,6 @@ struct State {
     count: usize,
     nd: Vec<usize>,
     path_u: usize,
-    outgoing_tree_edge: BTreeMap<usize, bool>,
     num_components: usize,
     sigma: BTreeMap<usize, BTreeSet<usize>>,
 }
@@ -83,7 +82,6 @@ impl State {
         let nd = vec![0; num_nodes];
         let degrees = vec![0; num_nodes];
         let visited = BTreeSet::new();
-        let outgoing_tree_edge = (0..num_nodes).map(|i| (i, true)).collect();
 
         State {
             next_sigma,
@@ -93,7 +91,6 @@ impl State {
             nd,
             degrees,
             visited,
-            outgoing_tree_edge,
             path_u: 0,
             count: 1,
             num_components: 0,
@@ -147,7 +144,7 @@ impl State {
 }
 
 fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
-    println!("w = {}", w);
+    // println!("w = {}", w);
     state.visited.insert(w);
     state.next_sigma[w] = w;
     state.next_on_path[w] = w;
@@ -157,7 +154,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
     state.count += 1;
 
     let edges = &graph[&w];
-    println!("{:?}", edges);
+    // println!("{:?}", edges);
 
     for edge in edges {
         let u = *edge;
@@ -194,18 +191,13 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                 state.next_on_path[w] = state.path_u;
             }
         } else {
-            if u == v && state.outgoing_tree_edge[&w] {
-                state.outgoing_tree_edge.insert(w, false);
-            // if u == v {
-            } else if state.pre[w] > state.pre[u] {
-                // } else if state.pre[w] > state.pre[u] {
-                // println!("pre[{}] > pre[{}]", w, u);
+            if u != v && state.pre[w] > state.pre[u] {
                 if state.pre[u] < state.lowpt[w] {
                     state.absorb_path(w, state.next_on_path[w], 0);
                     state.next_on_path[w] = w;
                     state.lowpt[w] = state.pre[u];
                 }
-            } else {
+            } else if u != v {
                 // println!("pre[{}] <= pre[{}]", w, u);
                 state.degrees[w] -= 2;
 
@@ -238,11 +230,12 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
 fn main() {
     let args: Vec<_> = env::args().collect();
 
-    println!("wait what");
+    // println!("wait what");
     let path = PathBuf::from(&args[1]);
 
     let gfa = parse_gfa(&path).unwrap();
-    println!("okay");
+
+    // println!("okay");
     let (graph, name_map) = gfa_adjacency_list(&gfa);
     let inv_name_map: HashMap<usize, &str> =
         name_map.iter().map(|(k, v)| (*v, k.as_str())).collect();
