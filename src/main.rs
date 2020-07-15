@@ -98,6 +98,14 @@ impl State {
         }
     }
 
+    fn is_tree_edge(&self, u: usize, v: usize) -> bool {
+        self.pre[u] < self.pre[v]
+    }
+
+    fn is_back_edge(&self, u: usize, v: usize) -> bool {
+        self.pre[u] > self.pre[v]
+    }
+
     fn absorb_path(&mut self, root: usize, path: usize, end: usize) {
         let mut current = root;
         let mut step = path;
@@ -110,7 +118,6 @@ impl State {
 
                 current = step;
                 if step != end {
-                    // println!("does this happen?");
                     step = self.next_on_path[step];
                 }
             }
@@ -191,13 +198,15 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                 state.next_on_path[w] = state.path_u;
             }
         } else {
-            if u != v && state.pre[w] > state.pre[u] {
+            // (w, u) outgoing back-edge of w, i.e. dfs(w) > dfs(u)
+            if state.is_back_edge(w, u) {
                 if state.pre[u] < state.lowpt[w] {
                     state.absorb_path(w, state.next_on_path[w], 0);
                     state.next_on_path[w] = w;
                     state.lowpt[w] = state.pre[u];
                 }
-            } else if u != v {
+            // (w, u) incoming back-edge of w, i.e. dfs(u) > dfs(w)
+            } else if state.is_tree_edge(w, u) {
                 // println!("pre[{}] <= pre[{}]", w, u);
                 state.degrees[w] -= 2;
 
