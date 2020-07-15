@@ -106,6 +106,10 @@ impl State {
         self.pre[u] > self.pre[v]
     }
 
+    fn is_null_path(&self, u: usize) -> bool {
+        self.next_on_path[u] == u
+    }
+
     fn absorb_path(&mut self, root: usize, path: usize, end: usize) {
         let mut current = root;
         let mut step = path;
@@ -129,16 +133,6 @@ impl State {
         let mut steps = vec![u];
         while u != start {
             u = self.next_sigma[u];
-            steps.push(u);
-        }
-        steps
-    }
-
-    fn node_path(&self, start: usize) -> Vec<usize> {
-        let mut u = self.next_on_path[start];
-        let mut steps = vec![u];
-        while u != start {
-            u = self.next_on_path[u];
             steps.push(u);
         }
         steps
@@ -178,7 +172,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
 
                 state.add_component(u);
 
-                if state.next_on_path[u] == u {
+                if state.is_null_path(u) {
                     state.path_u = w;
                 } else {
                     state.path_u = state.next_on_path[u];
@@ -210,13 +204,16 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                 // println!("pre[{}] <= pre[{}]", w, u);
                 state.degrees[w] -= 2;
 
-                if state.next_on_path[w] != w {
+                if !state.is_null_path(w) {
                     // println!("{}-path not null", w);
                     let mut parent = w;
                     let mut child = state.next_on_path[w];
 
                     while parent != child
+                        // child must have been visited before u
                         && state.pre[child] <= state.pre[u]
+                        // u must have been visited before the
+                        // children of child?
                         && state.pre[u] <= state.pre[child] + state.nd[child] - 1
                     {
                         parent = child;
@@ -225,7 +222,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
 
                     state.absorb_path(w, state.next_on_path[w], parent);
 
-                    if parent == state.next_on_path[parent] {
+                    if state.is_null_path(parent) {
                         state.next_on_path[w] = w;
                     } else {
                         state.next_on_path[w] = state.next_on_path[parent];
