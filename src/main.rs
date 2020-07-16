@@ -230,14 +230,14 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
             }
         } else {
             // (w, u) outgoing back-edge of w, i.e. dfs(w) > dfs(u)
-            if state.is_back_edge(w, u) {
+            if u != v && state.is_back_edge(w, u) {
                 if state.pre[u] < state.lowpt[w] {
                     state.absorb_path(w, state.next_on_path[w], 0);
                     state.next_on_path[w] = w;
                     state.lowpt[w] = state.pre[u];
                 }
             // (w, u) incoming back-edge of w, i.e. dfs(u) > dfs(w)
-            } else if state.is_tree_edge(w, u) {
+            } else if u != v {
                 // println!("pre[{}] <= pre[{}]", w, u);
                 state.degrees[w] -= 2;
 
