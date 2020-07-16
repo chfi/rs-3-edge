@@ -166,19 +166,12 @@ impl State {
         }
     }
 
-    fn sigma_path(&self, start: usize) -> Vec<usize> {
-        let mut u = self.next_sigma[start];
-        let mut steps = vec![u];
-        while u != start {
-            u = self.next_sigma[u];
-            steps.push(u);
-        }
-        steps
+    fn sigma_iter<'a>(&'a self, start: usize) -> SigmaIter<'a> {
+        SigmaIter::new(self, start)
     }
 
     fn add_component(&mut self, start: usize) {
-        self.sigma
-            .insert(start, self.sigma_path(start).into_iter().collect());
+        self.sigma.insert(start, self.sigma_iter(start).collect());
     }
 }
 
