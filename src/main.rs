@@ -148,17 +148,26 @@ impl State {
         self.next_on_path[u] == u
     }
 
-    fn absorb_path(&mut self, root: usize, path: usize, end: usize) {
-        let mut current = root;
-        let mut step = path;
+    fn next_step(&self, step: usize) -> Option<usize> {
+        let next = self.next_on_path[step];
+        if next != step {
+            Some(next)
+        } else {
+            None
+        }
+    }
 
-        if current != step && current != end {
+    fn absorb_path(&mut self, root: usize, path: usize, end: usize) {
+        if path != end {
+            let mut current = root;
+            let mut step = path;
             while current != step {
                 self.degrees[root] += self.degrees[step] - 2;
 
                 self.next_sigma.swap(root, step);
 
                 current = step;
+
                 if step != end {
                     step = self.next_on_path[step];
                 }
