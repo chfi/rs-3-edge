@@ -70,7 +70,40 @@ struct State {
     sigma: BTreeMap<usize, BTreeSet<usize>>,
 }
 
+// Struct representing an iterator over a node's sigma set
+struct SigmaIter<'a> {
+    start: usize,
+    current: usize,
+    next_sigma: &'a [usize],
+}
+
+impl<'a> SigmaIter<'a> {
+    fn new(state: &'a State, node: usize) -> SigmaIter<'a> {
+        let next_sigma = &state.next_sigma;
+        SigmaIter {
+            start: node,
+            current: next_sigma[node],
+            next_sigma,
+        }
+    }
+}
+
+impl<'a> Iterator for SigmaIter<'a> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<usize> {
+        // if current == start, we've reached the end of the chain
+        if self.current == self.start {
+            None
+        } else {
+            self.current = self.next_sigma[self.current];
+            Some(self.current)
+        }
+    }
+}
+
 impl State {
+    // make num_nodes explicit as temporary fix for unused segments in GFAs
     fn initialize(graph: &Graph, num_nodes: usize) -> State {
         let nodes: Vec<_> = graph.keys().collect();
         // let num_nodes = nodes.len() + 1;
