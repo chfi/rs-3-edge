@@ -74,7 +74,8 @@ struct State {
 struct SigmaIter<'a> {
     start: usize,
     current: usize,
-    next_sigma: Option<&'a [usize]>,
+    next_sigma: &'a [usize],
+    done: bool,
 }
 
 impl<'a> SigmaIter<'a> {
@@ -83,7 +84,8 @@ impl<'a> SigmaIter<'a> {
         SigmaIter {
             start: node,
             current: next_sigma[node],
-            next_sigma: Some(next_sigma),
+            next_sigma: next_sigma,
+            done: false,
         }
     }
 }
@@ -92,15 +94,14 @@ impl<'a> Iterator for SigmaIter<'a> {
     type Item = usize;
 
     fn next(&mut self) -> Option<usize> {
-        if self.next_sigma.is_none() {
+        if self.done {
             None
         } else {
-            let current = self.next_sigma.unwrap()[self.current];
             if self.current == self.start {
-                self.next_sigma = None;
+                self.done = true;
             }
-            self.current = current;
 
+            self.current = self.next_sigma[self.current];
             Some(self.current)
         }
     }
