@@ -37,7 +37,7 @@ impl ALGraph {
             if let Some(ix) = name_map.get(name) {
                 *ix
             } else {
-                let ix = name_map.len() + 1;
+                let ix = name_map.len();
                 name_map.insert(name.to_string(), ix);
                 inv_name_map.insert(ix, name.to_string());
                 ix
@@ -164,8 +164,8 @@ impl State {
         }
     }
 
-    fn absorb_path(&mut self, root: usize, path: usize, end: usize) {
-        if root != end {
+    fn absorb_path(&mut self, root: usize, path: usize, end: Option<usize>) {
+        if Some(root) != end {
             let mut current = root;
             let mut step = path;
             while current != step {
@@ -175,7 +175,7 @@ impl State {
 
                 current = step;
 
-                if step != end {
+                if Some(step) != end {
                     step = self.next_on_path[step];
                 }
             }
@@ -231,18 +231,18 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
 
             if state.lowpt[w] <= state.lowpt[u] {
                 // println!("lowpt[{}] <= lowpt[{}]", w, u);
-                state.absorb_path(w, state.path_u, 0);
+                state.absorb_path(w, state.path_u, None);
             } else {
                 // println!("lowpt[{}] > lowpt[{}]", w, u);
                 state.lowpt[w] = state.lowpt[u];
-                state.absorb_path(w, state.next_on_path[w], 0);
+                state.absorb_path(w, state.next_on_path[w], None);
                 state.next_on_path[w] = state.path_u;
             }
         } else {
             // (w, u) outgoing back-edge of w, i.e. dfs(w) > dfs(u)
             if u != v && state.is_back_edge(w, u) {
                 if state.pre[u] < state.lowpt[w] {
-                    state.absorb_path(w, state.next_on_path[w], 0);
+                    state.absorb_path(w, state.next_on_path[w], None);
                     state.next_on_path[w] = w;
                     state.lowpt[w] = state.pre[u];
                 }
@@ -261,13 +261,14 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                         && state.pre[child] <= state.pre[u]
                         // u must have been visited before the
                         // children of child?
-                        && state.pre[u] <= state.pre[child] + state.num_descendants[child] - 1
+                        && state.pre[u] <= state.pre[child] +
+                                           state.num_descendants[child] - 1
                     {
                         parent = child;
                         child = state.next_on_path[child];
                     }
 
-                    state.absorb_path(w, state.next_on_path[w], parent);
+                    state.absorb_path(w, state.next_on_path[w], Some(parent));
 
                     if state.is_null_path(parent) {
                         state.next_on_path[w] = w;
