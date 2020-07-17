@@ -158,7 +158,7 @@ impl State {
     }
 
     fn absorb_path(&mut self, root: usize, path: usize, end: usize) {
-        if path != end {
+        if root != end {
             let mut current = root;
             let mut step = path;
             while current != step {
