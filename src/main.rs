@@ -72,7 +72,7 @@ struct State {
     pre: Vec<usize>,
     lowpt: Vec<usize>,
     count: usize,
-    nd: Vec<usize>,
+    num_descendants: Vec<usize>,
     path_u: usize,
     num_components: usize,
     sigma: BTreeMap<usize, BTreeSet<usize>>,
@@ -124,7 +124,7 @@ impl State {
         let next_on_path = vec![0; num_nodes];
         let pre = vec![0; num_nodes];
         let lowpt = vec![0; num_nodes];
-        let nd = vec![0; num_nodes];
+        let num_descendants = vec![0; num_nodes];
         let degrees = vec![0; num_nodes];
         let visited = BTreeSet::new();
 
@@ -133,7 +133,7 @@ impl State {
             next_on_path,
             pre,
             lowpt,
-            nd,
+            num_descendants,
             degrees,
             visited,
             path_u: 0,
@@ -198,7 +198,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
     state.next_on_path[w] = w;
     state.pre[w] = state.count;
     state.lowpt[w] = state.count;
-    state.nd[w] = 1;
+    state.num_descendants[w] = 1;
     state.count += 1;
 
     let edges = &graph[&w];
@@ -210,7 +210,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
 
         if !state.visited.contains(&u) {
             three_edge_connect(graph, state, u, w);
-            state.nd[w] += state.nd[u];
+            state.num_descendants[w] += state.num_descendants[u];
 
             if state.degrees[u] <= 2 {
                 // println!("degrees[{}] <= 2", u);
@@ -261,7 +261,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                         && state.pre[child] <= state.pre[u]
                         // u must have been visited before the
                         // children of child?
-                        && state.pre[u] <= state.pre[child] + state.nd[child] - 1
+                        && state.pre[u] <= state.pre[child] + state.num_descendants[child] - 1
                     {
                         parent = child;
                         child = state.next_on_path[child];
