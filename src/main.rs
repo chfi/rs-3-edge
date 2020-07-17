@@ -15,44 +15,52 @@ type AdjacencyList = Vec<usize>;
 
 type Graph = BTreeMap<usize, AdjacencyList>;
 
-/// Constructs an adjacency list representation of the given GFA.
-/// Returns both the adjacency list and a map from GFA segment names
-/// to corresponding index in the graph.
-fn gfa_adjacency_list(gfa: &GFA) -> (Graph, HashMap<String, usize>) {
-    let mut result: Graph = BTreeMap::new();
-    let mut name_map = HashMap::new();
+/// An adjacency list representation of a GFA graph, including the
+/// maps required to go from GFA segment names to graph node indices,
+/// and back
+struct ALGraph {
+    graph: Graph,
+    name_map: HashMap<String, usize>,
+    inv_name_map: HashMap<usize, String>,
+}
 
-    // for (ix, s) in gfa.segments.iter().enumerate() {
-    //     trace = ix + 1;
-    //     name_map.insert(s.name.clone(), ix + 1);
-    // }
+impl ALGraph {
+    /// Constructs an adjacency list representation of the given GFA.
+    /// Returns both the adjacency list and a map from GFA segment names
+    /// to corresponding index in the graph.
+    pub fn from_gfa(gfa: &GFA) -> ALGraph {
+        let mut graph: BTreeMap<usize, AdjacencyList> = BTreeMap::new();
+        let mut name_map = HashMap::new();
+        let mut inv_name_map = HashMap::new();
 
-    let mut get_ix = |name: &str| {
-        if let Some(ix) = name_map.get(name) {
-            *ix
-        } else {
-            let ix = name_map.len();
-            name_map.insert(name.to_string(), ix + 1);
-            ix
+        let mut get_ix = |name: &str| {
+            if let Some(ix) = name_map.get(name) {
+                *ix
+            } else {
+                let ix = name_map.len() + 1;
+                name_map.insert(name.to_string(), ix);
+                inv_name_map.insert(ix, name.to_string());
+                ix
+            }
+        };
+
+        for link in gfa.links.iter() {
+            let from = &link.from_segment;
+            let to = &link.to_segment;
+
+            let from_ix = get_ix(from);
+            let to_ix = get_ix(to);
+
+            graph.entry(from_ix).or_default().push(to_ix);
+            graph.entry(to_ix).or_default().push(from_ix);
         }
-    };
 
-    for link in gfa.links.iter() {
-        let from = &link.from_segment;
-        let to = &link.to_segment;
-        // let name_len = name_map.len();
-
-        let from_ix = get_ix(from);
-        let to_ix = get_ix(to);
-
-        if from != to {
-            // Some of the GFAs have identity links
+        ALGraph {
+            graph,
+            name_map,
+            inv_name_map,
         }
-        result.entry(from_ix).or_default().push(to_ix);
-        result.entry(to_ix).or_default().push(from_ix);
     }
-
-    (result, name_map)
 }
 
 #[derive(Default, Debug)]
@@ -108,10 +116,9 @@ impl<'a> Iterator for SigmaIter<'a> {
 }
 
 impl State {
-    // make num_nodes explicit as temporary fix for unused segments in GFAs
-    fn initialize(graph: &Graph, num_nodes: usize) -> State {
+    fn initialize(graph: &Graph) -> State {
         let nodes: Vec<_> = graph.keys().collect();
-        // let num_nodes = nodes.len() + 1;
+        let num_nodes = nodes.len() + 1;
 
         let next_sigma = vec![0; num_nodes];
         let next_on_path = vec![0; num_nodes];
@@ -276,28 +283,24 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
 fn main() {
     let args: Vec<_> = env::args().collect();
 
-    // println!("wait what");
     let path = PathBuf::from(&args[1]);
 
     let gfa = parse_gfa(&path).unwrap();
 
-    // println!("okay");
-    let (graph, name_map) = gfa_adjacency_list(&gfa);
-    let inv_name_map: HashMap<usize, &str> =
-        name_map.iter().map(|(k, v)| (*v, k.as_str())).collect();
+    let algraph = ALGraph::from_gfa(&gfa);
 
     println!("# segments: {}", gfa.segments.len());
     println!("# links: {}", gfa.links.len());
-    println!("# names: {}", name_map.len());
-    println!("# nodes: {}", graph.len());
+    println!("# names: {}", algraph.name_map.len());
+    println!("# nodes: {}", algraph.graph.len());
 
-    let mut state = State::initialize(&graph, gfa.segments.len() + 1);
+    let mut state = State::initialize(&algraph.graph);
 
-    let nodes: Vec<_> = graph.keys().collect();
+    let nodes: Vec<_> = algraph.graph.keys().collect();
 
     for &n in nodes {
         if !state.visited.contains(&n) {
-            three_edge_connect(&graph, &mut state, n, 0);
+            three_edge_connect(&algraph.graph, &mut state, n, 0);
             state.num_components += 1;
             state.add_component(n);
         }
@@ -309,7 +312,7 @@ fn main() {
         print!("component: ");
         for s in v {
             if s != 0 {
-                print!(" {}", inv_name_map[&s]);
+                print!(" {}", algraph.inv_name_map[&s]);
             }
         }
 
