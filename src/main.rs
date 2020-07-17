@@ -1,7 +1,4 @@
 use std::env;
-use std::fs::File;
-use std::io::prelude::*;
-use std::io::BufReader;
 use std::path::PathBuf;
 
 use std::collections::BTreeMap;
@@ -74,7 +71,6 @@ struct State {
     count: usize,
     num_descendants: Vec<usize>,
     path_u: usize,
-    num_components: usize,
     sigma: BTreeMap<usize, BTreeSet<usize>>,
 }
 
@@ -117,28 +113,18 @@ impl<'a> Iterator for SigmaIter<'a> {
 
 impl State {
     fn initialize(graph: &Graph) -> State {
-        let nodes: Vec<_> = graph.keys().collect();
-        let num_nodes = nodes.len() + 1;
-
-        let next_sigma = vec![0; num_nodes];
-        let next_on_path = vec![0; num_nodes];
-        let pre = vec![0; num_nodes];
-        let lowpt = vec![0; num_nodes];
-        let num_descendants = vec![0; num_nodes];
-        let degrees = vec![0; num_nodes];
-        let visited = BTreeSet::new();
+        let num_nodes = graph.len() + 1;
 
         State {
-            next_sigma,
-            next_on_path,
-            pre,
-            lowpt,
-            num_descendants,
-            degrees,
-            visited,
+            next_sigma: vec![0; num_nodes],
+            next_on_path: vec![0; num_nodes],
+            pre: vec![0; num_nodes],
+            lowpt: vec![0; num_nodes],
+            num_descendants: vec![0; num_nodes],
+            degrees: vec![0; num_nodes],
+            visited: BTreeSet::new(),
             path_u: 0,
             count: 1,
-            num_components: 0,
             sigma: BTreeMap::new(),
         }
     }
@@ -192,7 +178,6 @@ impl State {
 }
 
 fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
-    // println!("w = {}", w);
     state.visited.insert(w);
     state.next_sigma[w] = w;
     state.next_on_path[w] = w;
@@ -202,7 +187,6 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
     state.count += 1;
 
     let edges = &graph[&w];
-    // println!("{:?}", edges);
 
     for edge in edges {
         let u = *edge;
@@ -213,9 +197,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
             state.num_descendants[w] += state.num_descendants[u];
 
             if state.degrees[u] <= 2 {
-                // println!("degrees[{}] <= 2", u);
                 state.degrees[w] += state.degrees[u] - 2;
-                state.num_components += 1;
 
                 state.add_component(u);
 
@@ -225,15 +207,12 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                     state.path_u = state.next_on_path[u];
                 }
             } else {
-                // println!("degrees[{}] > 2", u);
                 state.path_u = u;
             }
 
             if state.lowpt[w] <= state.lowpt[u] {
-                // println!("lowpt[{}] <= lowpt[{}]", w, u);
                 state.absorb_path(w, state.path_u, None);
             } else {
-                // println!("lowpt[{}] > lowpt[{}]", w, u);
                 state.lowpt[w] = state.lowpt[u];
                 state.absorb_path(w, state.next_on_path[w], None);
                 state.next_on_path[w] = state.path_u;
@@ -248,11 +227,9 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                 }
             // (w, u) incoming back-edge of w, i.e. dfs(u) > dfs(w)
             } else if u != v {
-                // println!("pre[{}] <= pre[{}]", w, u);
                 state.degrees[w] -= 2;
 
                 if !state.is_null_path(w) {
-                    // println!("{}-path not null", w);
                     let mut parent = w;
                     let mut child = state.next_on_path[w];
 
@@ -302,12 +279,11 @@ fn main() {
     for &n in nodes {
         if !state.visited.contains(&n) {
             three_edge_connect(&algraph.graph, &mut state, n, 0);
-            state.num_components += 1;
             state.add_component(n);
         }
     }
 
-    println!("# of components: {}", state.num_components);
+    println!("# of components: {}", state.sigma.len());
 
     for (_k, v) in state.sigma {
         print!("component: ");
