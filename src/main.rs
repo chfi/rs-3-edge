@@ -202,18 +202,25 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                 state.add_component(u);
 
                 if state.is_null_path(u) {
+                    // P_u = w, in the paper
                     state.path_u = w;
                 } else {
+                    // P_u = P_u - u, in the paper
+                    // the path w + P_u is now null?
                     state.path_u = state.next_on_path[u];
                 }
             } else {
+                // since degree[u] != 2, u can be absorbed
                 state.path_u = u;
             }
 
             if state.lowpt[w] <= state.lowpt[u] {
+                // w + P_u in paper
                 state.absorb_path(w, state.path_u, None);
             } else {
                 state.lowpt[w] = state.lowpt[u];
+
+                // P_w in paper
                 state.absorb_path(w, state.next_on_path[w], None);
                 state.next_on_path[w] = state.path_u;
             }
@@ -222,6 +229,8 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
             if u != v && state.is_back_edge(w, u) {
                 if state.pre[u] < state.lowpt[w] {
                     state.absorb_path(w, state.next_on_path[w], None);
+
+                    // P_w in paper
                     state.next_on_path[w] = w;
                     state.lowpt[w] = state.pre[u];
                 }
@@ -245,6 +254,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                         child = state.next_on_path[child];
                     }
 
+                    // P_w[w..u] in paper
                     state.absorb_path(w, state.next_on_path[w], Some(parent));
 
                     if state.is_null_path(parent) {
@@ -258,6 +268,38 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
     }
 }
 
+fn print_components(
+    inv_name_map: &HashMap<usize, String>,
+    sigma: &BTreeMap<usize, BTreeSet<usize>>,
+) {
+    for (_k, component) in sigma {
+        for (i, j) in component.iter().enumerate() {
+            if i > 0 {
+                print!("\t");
+            }
+            let name = &inv_name_map[&j];
+            print!("{}", name);
+        }
+        println!();
+    }
+}
+
+fn print_components_compat(
+    inv_name_map: &HashMap<usize, String>,
+    sigma: &BTreeMap<usize, BTreeSet<usize>>,
+) {
+    println!("# of components: {}", sigma.len());
+    for (_k, v) in sigma {
+        print!("component: ");
+        for s in v {
+            if *s != 0 {
+                print!(" {}", inv_name_map[s]);
+            }
+        }
+        println!();
+    }
+}
+
 fn main() {
     let args: Vec<_> = env::args().collect();
 
@@ -266,11 +308,6 @@ fn main() {
     let gfa = parse_gfa(&path).unwrap();
 
     let algraph = ALGraph::from_gfa(&gfa);
-
-    println!("# segments: {}", gfa.segments.len());
-    println!("# links: {}", gfa.links.len());
-    println!("# names: {}", algraph.name_map.len());
-    println!("# nodes: {}", algraph.graph.len());
 
     let mut state = State::initialize(&algraph.graph);
 
@@ -283,16 +320,6 @@ fn main() {
         }
     }
 
-    println!("# of components: {}", state.sigma.len());
-
-    for (_k, v) in state.sigma {
-        print!("component: ");
-        for s in v {
-            if s != 0 {
-                print!(" {}", algraph.inv_name_map[&s]);
-            }
-        }
-
-        println!();
-    }
+    print_components(&algraph.inv_name_map, &state.sigma);
+    // print_components_compat(&algraph.inv_name_map, &state.sigma);
 }
