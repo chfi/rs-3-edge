@@ -6,8 +6,8 @@ use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
-use gfa::gfa::GFA;
-use gfa::parser::parse_gfa_stream;
+use gfa::gfa::{GFAParsingConfig, GFA};
+use gfa::parser::parse_gfa_stream_config;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{BufReader, Lines};
@@ -30,7 +30,11 @@ impl ALGraph {
     /// segment names to corresponding index in the graph.
     fn from_gfa_stream<'a, B: BufRead>(lines: &'a mut Lines<B>) -> ALGraph {
         use gfa::gfa::Line;
-        let gfa_lines = parse_gfa_stream(lines);
+        let conf = GFAParsingConfig {
+            links: true,
+            ..GFAParsingConfig::none()
+        };
+        let gfa_lines = parse_gfa_stream_config(lines, conf);
 
         let mut graph: BTreeMap<usize, AdjacencyList> = BTreeMap::new();
         let mut name_map = HashMap::new();
@@ -390,7 +394,6 @@ fn main() {
 
     let buffer = File::open(&path).unwrap();
     let reader = BufReader::new(buffer);
-
     let algraph = ALGraph::from_gfa_stream(&mut reader.lines());
 
     let mut state = State::initialize(&algraph.graph);
