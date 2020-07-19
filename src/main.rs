@@ -193,13 +193,14 @@ enum Inst {
     Init(usize, usize),
     Loop(usize, usize, usize),
     // Recurse
-    Return(usize, usize),
+    Return(usize, usize, usize),
 }
 
 // fn &mut St
 
 fn init_inst(state: &mut State, graph: &Graph, inst: Inst, stack: &mut Stack2) {
     if let Inst::Init(w, v) = inst {
+        // println!("|{}|visiting|{}|{}|-|", state.count, w, v);
         state.visited.insert(w);
         state.next_sigma[w] = w;
         state.next_on_path[w] = w;
@@ -208,12 +209,12 @@ fn init_inst(state: &mut State, graph: &Graph, inst: Inst, stack: &mut Stack2) {
         state.num_descendants[w] = 1;
         state.count += 1;
 
-        for edge in &graph[&w] {
-            println!("pushin Loop{}, {}, {}", w, v, edge);
+        let mut neighbors: Vec<_> = graph[&w].iter().collect();
+        neighbors.reverse();
+        for edge in neighbors {
+            // println!("pushin Loop{}, {}, {}", w, v, edge);
             stack.push_front(Inst::Loop(w, v, *edge));
         }
-
-        stack.push_front(Inst::Return(w, v));
     } else {
         panic!("oh no!");
     }
@@ -221,20 +222,23 @@ fn init_inst(state: &mut State, graph: &Graph, inst: Inst, stack: &mut Stack2) {
 
 fn loop_inst(state: &mut State, graph: &Graph, inst: Inst, stack: &mut Stack2) {
     if let Inst::Loop(w, v, u) = inst {
-        println!("in Loop {}, {}, {}", w, v, u);
+        // println!("|{}|looping|{}|{}|{}|", state.count, w, v, u);
         state.degrees[w] += 1;
 
         if !state.visited.contains(&u) {
+            // println!("|{}|unvisited|{}|{}|{}|", state.count, w, v, u);
             // here we want to go deeper...
             // if printing {
             //     println!("|recursing with|{}| {}|", u, w);
             // }
 
+            stack.push_front(Inst::Return(w, v, u));
             stack.push_front(Inst::Init(u, w));
         // stack2.push_front((u, w));
 
         // return;
         } else {
+            // println!("|{}|previously visited|{}|{}|{}|", state.count, w, v, u);
             // (w, u) outgoing back-edge of w, i.e. dfs(w) > dfs(u)
             if u != v && state.is_back_edge(w, u) {
                 if state.pre[u] < state.lowpt[w] {
@@ -274,6 +278,8 @@ fn loop_inst(state: &mut State, graph: &Graph, inst: Inst, stack: &mut Stack2) {
                     }
                 }
             }
+
+            // println!("|{}|visited, absorbed|{}|{}|{}|", state.count, w, v, u);
         }
     } else {
         panic!("this is bad!");
@@ -281,8 +287,8 @@ fn loop_inst(state: &mut State, graph: &Graph, inst: Inst, stack: &mut Stack2) {
 }
 
 fn return_inst(state: &mut State, inst: Inst) {
-    if let Inst::Return(u, w) = inst {
-        println!("returning {}, {}", u, w);
+    if let Inst::Return(w, v, u) = inst {
+        // println!("|{}|past recursion|{}|{}|{}|", state.count, w, v, u);
         state.num_descendants[w] += state.num_descendants[u];
 
         if state.degrees[u] <= 2 {
@@ -313,6 +319,7 @@ fn return_inst(state: &mut State, inst: Inst) {
             state.absorb_path(w, state.next_on_path[w], None);
             state.next_on_path[w] = state.path_u;
         }
+    // println!("|{}|unvisited, absorbed|{}|{}|{}|", state.count, w, v, u);
     } else {
         panic!("shouldn't happen!");
     }
@@ -323,14 +330,11 @@ fn return_inst(state: &mut State, inst: Inst) {
 // }
 
 fn three_edge_connect_new(graph: &Graph, state: &mut State) {
-    let printing = true;
-    // let mut state = state_in.clone();
-
     // function, w, v
     // let mut stack: VecDeque<(usize, usize, usize)> = VecDeque::new();
     let mut stack: Stack2 = VecDeque::new();
 
-    let k = graph.keys().take(1).next().unwrap();
+    // let k = graph.keys().take(1).next().unwrap();
 
     // type Stack = VecDeque<(usize, usize)>;
     type Stack = VecDeque<(usize, usize, usize)>;
@@ -342,7 +346,7 @@ fn three_edge_connect_new(graph: &Graph, state: &mut State) {
 
     let connect = |state: &mut State, stack: &mut Stack2| {
         // println!("{}\t-\tconnect", state.count);
-        println!("{:?}", stack);
+        // println!("{:?}", stack);
         while let Some(inst) = stack.pop_front() {
             match inst {
                 // init
@@ -354,8 +358,8 @@ fn three_edge_connect_new(graph: &Graph, state: &mut State) {
                     loop_inst(state, graph, Inst::Loop(w, v, u), stack);
                 }
                 // returning
-                Inst::Return(w, v) => {
-                    return_inst(state, Inst::Return(w, v));
+                Inst::Return(w, v, u) => {
+                    return_inst(state, Inst::Return(w, v, u));
                 }
             }
         }
@@ -403,9 +407,7 @@ fn three_edge_connect_new(graph: &Graph, state: &mut State) {
 fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
     let printing = true;
 
-    if printing {
-        println!("|visiting|{}|{}|", w, v);
-    }
+    // println!("|{}|visiting|{}|{}|-|", state.count, w, v);
     state.visited.insert(w);
     state.next_sigma[w] = w;
     state.next_on_path[w] = w;
@@ -420,16 +422,19 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
 
     for edge in edges {
         let u = *edge;
+        // println!("|{}|looping|{}|{}|{}|", state.count, w, v, u);
         state.degrees[w] += 1;
 
         if !state.visited.contains(&u) {
-            if printing {
-                println!("|recursing from|{}|{}|", w, v);
-            }
+            // println!("|{}|unvisited|{}|{}|{}|", state.count, w, v, u);
+            // if printing {
+            //     println!("|recursing from|{}|{}|", w, v);
+            // }
             three_edge_connect(graph, state, u, w);
-            if printing {
-                println!("|past recursion|{}|{}|", w, v);
-            }
+            // println!("|{}|past recursion|{}|{}|{}|", state.count, w, v, u);
+            // if printing {
+            //     println!("|past recursion|{}|{}|", w, v);
+            // }
             state.num_descendants[w] += state.num_descendants[u];
 
             if state.degrees[u] <= 2 {
@@ -460,10 +465,9 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                 state.absorb_path(w, state.next_on_path[w], None);
                 state.next_on_path[w] = state.path_u;
             }
+        // println!("|{}|unvisited, absorbed|{}|{}|{}|", state.count, w, v, u);
         } else {
-            if printing {
-                println!("|already visited|{}||", u);
-            }
+            // println!("|{}|previously visited|{}|{}|{}|", state.count, w, v, u);
             // (w, u) outgoing back-edge of w, i.e. dfs(w) > dfs(u)
             if u != v && state.is_back_edge(w, u) {
                 if state.pre[u] < state.lowpt[w] {
@@ -503,11 +507,15 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                     }
                 }
             }
+
+            // println!("|{}|visited, absorbed|{}|{}|{}|", state.count, w, v, u);
         }
-        if printing {
-            println!("|end of if|{}|{}|", w, v);
-        }
+
+        // if printing {
+        //     println!("|end of if|{}|{}|", w, v);
+        // }
     }
+    // println!("|{}|returning|{}|{}|-|", state.count, w, v);
 }
 
 /// Prints each component, one per row, with space-delimited GFA
@@ -564,6 +572,8 @@ fn main() {
     //         state.add_component(n);
     //     }
     // }
+
+    // println!("# components: {}", state.sigma.len());
 
     print_components(&algraph.inv_name_map, &state.sigma);
     // print_components_compat(&algraph.inv_name_map, &state.sigma);
