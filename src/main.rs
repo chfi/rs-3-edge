@@ -7,7 +7,10 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 
 use gfa::gfa::GFA;
-use gfa::parser::parse_gfa;
+use gfa::parser::parse_gfa_stream;
+use std::fs::File;
+use std::io::prelude::*;
+use std::io::{BufReader, Lines};
 
 type AdjacencyList = Vec<usize>;
 
@@ -19,6 +22,46 @@ type Graph = BTreeMap<usize, AdjacencyList>;
 struct ALGraph {
     graph: Graph,
     inv_names: Vec<String>,
+}
+
+impl ALGraph {
+    /// Constructs an adjacency list representation of the given GFA
+    /// parser stream. Returns both the adjacency list and a map from GFA
+    /// segment names to corresponding index in the graph.
+    fn from_gfa_stream<'a, B: BufRead>(lines: &'a mut Lines<B>) -> ALGraph {
+        use gfa::gfa::Line;
+        let gfa_lines = parse_gfa_stream(lines);
+
+        let mut graph: BTreeMap<usize, AdjacencyList> = BTreeMap::new();
+        let mut name_map = HashMap::new();
+        let mut inv_names = Vec::new();
+
+        let mut get_ix = |name: &str| {
+            if let Some(ix) = name_map.get(name) {
+                *ix
+            } else {
+                let ix = name_map.len();
+                name_map.insert(name.to_string(), ix);
+                inv_names.push(name.to_string());
+                ix
+            }
+        };
+
+        for line in gfa_lines {
+            if let Line::Link(link) = line {
+                let from = &link.from_segment;
+                let to = &link.to_segment;
+
+                let from_ix = get_ix(from);
+                let to_ix = get_ix(to);
+
+                graph.entry(from_ix).or_default().push(to_ix);
+                graph.entry(to_ix).or_default().push(from_ix);
+            }
+        }
+
+        ALGraph { graph, inv_names }
+    }
 }
 
 impl ALGraph {
@@ -169,11 +212,7 @@ impl State {
     }
 
     fn add_component(&mut self, start: usize) {
-        // println!("sigma - {}", self.next_sigma.len())
-        // println!("before iter");
-        let x: BTreeSet<usize> = self.sigma_iter(start).collect();
-        // println!("length: {}", x.len());
-        self.sigma.insert(start, x);
+        self.sigma.insert(start, self.sigma_iter(start).collect());
     }
 }
 
@@ -274,7 +313,7 @@ fn run_inst(
                 // println!("|{}|visited, absorbed|{}|{}|{}|", state.count, w, v, u);
             }
         }
-        Inst::Return(w, v, u) => {
+        Inst::Return(w, _v, u) => {
             // println!("|{}|past recursion|{}|{}|{}|", state.count, w, v, u);
             state.num_descendants[w] += state.num_descendants[u];
 
@@ -349,21 +388,10 @@ fn main() {
 
     let path = PathBuf::from(&args[1]);
 
-    let algraph = {
-        let gfa = {
-            let tmp = parse_gfa(&path).unwrap();
+    let buffer = File::open(&path).unwrap();
+    let reader = BufReader::new(buffer);
 
-            GFA {
-                version: None,
-                segments: Vec::new(),
-                links: tmp.links,
-                containments: Vec::new(),
-                paths: Vec::new(),
-            }
-        };
-
-        ALGraph::from_gfa(&gfa)
-    };
+    let algraph = ALGraph::from_gfa_stream(&mut reader.lines());
 
     let mut state = State::initialize(&algraph.graph);
     three_edge_connect(&algraph.graph, &mut state);

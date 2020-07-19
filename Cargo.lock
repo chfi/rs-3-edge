@@ -29,9 +29,9 @@ checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 
 [[package]]
 name = "gfa"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40212f611b489d49820572528b2de1348d414300c1dab8ebecca66db5bbcddae"
+checksum = "7c90a9792348c7015d91b4ee95c0b4ff3c3da1942e4ee37c6b3aa480fa551eed"
 dependencies = [
  "lazy_static",
  "nom",
