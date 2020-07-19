@@ -1,16 +1,15 @@
-use std::env;
-use std::path::PathBuf;
-
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::VecDeque;
-
-use gfa::gfa::{GFAParsingConfig, GFA};
-use gfa::parser::parse_gfa_stream_config;
+use std::env;
 use std::fs::File;
 use std::io::prelude::*;
-use std::io::{BufReader, Lines};
+use std::io::BufReader;
+use std::path::PathBuf;
+
+use gfa::gfa::GFAParsingConfig;
+use gfa::parser::parse_gfa_stream_config;
 
 type AdjacencyList = Vec<usize>;
 
@@ -28,8 +27,11 @@ impl ALGraph {
     /// Constructs an adjacency list representation of the given GFA
     /// parser stream. Returns both the adjacency list and a map from GFA
     /// segment names to corresponding index in the graph.
-    fn from_gfa_stream<'a, B: BufRead>(lines: &'a mut Lines<B>) -> ALGraph {
-        use gfa::gfa::Line;
+    fn from_gfa_file(path: &PathBuf) -> ALGraph {
+        let buffer = File::open(&path).unwrap();
+        let reader = BufReader::new(buffer);
+        let lines = &mut reader.lines();
+
         let conf = GFAParsingConfig {
             links: true,
             ..GFAParsingConfig::none()
@@ -51,6 +53,7 @@ impl ALGraph {
             }
         };
 
+        use gfa::gfa::Line;
         for line in gfa_lines {
             if let Line::Link(link) = line {
                 let from = &link.from_segment;
@@ -62,41 +65,6 @@ impl ALGraph {
                 graph.entry(from_ix).or_default().push(to_ix);
                 graph.entry(to_ix).or_default().push(from_ix);
             }
-        }
-
-        ALGraph { graph, inv_names }
-    }
-}
-
-impl ALGraph {
-    /// Constructs an adjacency list representation of the given GFA.
-    /// Returns both the adjacency list and a map from GFA segment names
-    /// to corresponding index in the graph.
-    pub fn from_gfa(gfa: &GFA) -> ALGraph {
-        let mut graph: BTreeMap<usize, AdjacencyList> = BTreeMap::new();
-        let mut name_map = HashMap::new();
-        let mut inv_names = Vec::with_capacity(gfa.segments.len());
-
-        let mut get_ix = |name: &str| {
-            if let Some(ix) = name_map.get(name) {
-                *ix
-            } else {
-                let ix = name_map.len();
-                name_map.insert(name.to_string(), ix);
-                inv_names.push(name.to_string());
-                ix
-            }
-        };
-
-        for link in gfa.links.iter() {
-            let from = &link.from_segment;
-            let to = &link.to_segment;
-
-            let from_ix = get_ix(from);
-            let to_ix = get_ix(to);
-
-            graph.entry(from_ix).or_default().push(to_ix);
-            graph.entry(to_ix).or_default().push(from_ix);
         }
 
         ALGraph { graph, inv_names }
@@ -172,25 +140,12 @@ impl State {
         }
     }
 
-    fn is_tree_edge(&self, u: usize, v: usize) -> bool {
-        self.pre[u] < self.pre[v]
-    }
-
     fn is_back_edge(&self, u: usize, v: usize) -> bool {
         self.pre[u] > self.pre[v]
     }
 
     fn is_null_path(&self, u: usize) -> bool {
         self.next_on_path[u] == u
-    }
-
-    fn next_step(&self, step: usize) -> Option<usize> {
-        let next = self.next_on_path[step];
-        if next != step {
-            Some(next)
-        } else {
-            None
-        }
     }
 
     fn absorb_path(&mut self, root: usize, path: usize, end: Option<usize>) {
@@ -258,16 +213,9 @@ fn run_inst(
 
             if !state.visited.contains(&u) {
                 // println!("|{}|unvisited|{}|{}|{}|", state.count, w, v, u);
-                // here we want to go deeper...
-                // if printing {
-                //     println!("|recursing with|{}| {}|", u, w);
-                // }
 
                 stack.push_front(Inst::Return(w, v, u));
                 stack.push_front(Inst::Init(u, w));
-            // stack2.push_front((u, w));
-
-            // return;
             } else {
                 // println!("|{}|previously visited|{}|{}|{}|", state.count, w, v, u);
                 // (w, u) outgoing back-edge of w, i.e. dfs(w) > dfs(u)
@@ -391,12 +339,11 @@ fn main() {
     let args: Vec<_> = env::args().collect();
 
     let path = PathBuf::from(&args[1]);
-
-    let buffer = File::open(&path).unwrap();
-    let reader = BufReader::new(buffer);
-    let algraph = ALGraph::from_gfa_stream(&mut reader.lines());
+    let algraph = ALGraph::from_gfa_file(&path);
 
     let mut state = State::initialize(&algraph.graph);
+
     three_edge_connect(&algraph.graph, &mut state);
+
     print_components(&algraph.inv_names, &state.sigma);
 }
