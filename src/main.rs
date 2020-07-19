@@ -18,8 +18,7 @@ type Graph = BTreeMap<usize, AdjacencyList>;
 /// and back
 struct ALGraph {
     graph: Graph,
-    name_map: HashMap<String, usize>,
-    inv_name_map: HashMap<usize, String>,
+    inv_names: Vec<String>,
 }
 
 impl ALGraph {
@@ -29,7 +28,7 @@ impl ALGraph {
     pub fn from_gfa(gfa: &GFA) -> ALGraph {
         let mut graph: BTreeMap<usize, AdjacencyList> = BTreeMap::new();
         let mut name_map = HashMap::new();
-        let mut inv_name_map = HashMap::new();
+        let mut inv_names = Vec::with_capacity(gfa.segments.len());
 
         let mut get_ix = |name: &str| {
             if let Some(ix) = name_map.get(name) {
@@ -37,7 +36,7 @@ impl ALGraph {
             } else {
                 let ix = name_map.len();
                 name_map.insert(name.to_string(), ix);
-                inv_name_map.insert(ix, name.to_string());
+                inv_names.push(name.to_string());
                 ix
             }
         };
@@ -53,11 +52,7 @@ impl ALGraph {
             graph.entry(to_ix).or_default().push(from_ix);
         }
 
-        ALGraph {
-            graph,
-            name_map,
-            inv_name_map,
-        }
+        ALGraph { graph, inv_names }
     }
 }
 
@@ -182,259 +177,105 @@ impl State {
     }
 }
 
-// struct Stack {
-//     inst: Inst,
-// };
-
-type Stack2 = VecDeque<Inst>;
-
 #[derive(Debug)]
 enum Inst {
     Init(usize, usize),
     Loop(usize, usize, usize),
-    // Recurse
     Return(usize, usize, usize),
 }
 
-// fn &mut St
+type InstStack = VecDeque<Inst>;
 
-fn init_inst(state: &mut State, graph: &Graph, inst: Inst, stack: &mut Stack2) {
-    if let Inst::Init(w, v) = inst {
-        // println!("|{}|visiting|{}|{}|-|", state.count, w, v);
-        state.visited.insert(w);
-        state.next_sigma[w] = w;
-        state.next_on_path[w] = w;
-        state.pre[w] = state.count;
-        state.lowpt[w] = state.count;
-        state.num_descendants[w] = 1;
-        state.count += 1;
+fn run_inst(
+    inst: Inst,
+    stack: &mut InstStack,
+    state: &mut State,
+    graph: &Graph,
+) {
+    match inst {
+        Inst::Init(w, v) => {
+            state.visited.insert(w);
+            state.next_sigma[w] = w;
+            state.next_on_path[w] = w;
+            state.pre[w] = state.count;
+            state.lowpt[w] = state.count;
+            state.num_descendants[w] = 1;
+            state.count += 1;
 
-        let mut neighbors: Vec<_> = graph[&w].iter().collect();
-        neighbors.reverse();
-        for edge in neighbors {
-            // println!("pushin Loop{}, {}, {}", w, v, edge);
-            stack.push_front(Inst::Loop(w, v, *edge));
+            let mut neighbors: Vec<_> = graph[&w].iter().collect();
+            neighbors.reverse();
+            for edge in neighbors {
+                // println!("pushin Loop{}, {}, {}", w, v, edge);
+                stack.push_front(Inst::Loop(w, v, *edge));
+            }
         }
-    } else {
-        panic!("oh no!");
-    }
-}
+        Inst::Loop(w, v, u) => {
+            // println!("|{}|looping|{}|{}|{}|", state.count, w, v, u);
+            state.degrees[w] += 1;
 
-fn loop_inst(state: &mut State, graph: &Graph, inst: Inst, stack: &mut Stack2) {
-    if let Inst::Loop(w, v, u) = inst {
-        // println!("|{}|looping|{}|{}|{}|", state.count, w, v, u);
-        state.degrees[w] += 1;
+            if !state.visited.contains(&u) {
+                // println!("|{}|unvisited|{}|{}|{}|", state.count, w, v, u);
+                // here we want to go deeper...
+                // if printing {
+                //     println!("|recursing with|{}| {}|", u, w);
+                // }
 
-        if !state.visited.contains(&u) {
-            // println!("|{}|unvisited|{}|{}|{}|", state.count, w, v, u);
-            // here we want to go deeper...
-            // if printing {
-            //     println!("|recursing with|{}| {}|", u, w);
-            // }
+                stack.push_front(Inst::Return(w, v, u));
+                stack.push_front(Inst::Init(u, w));
+            // stack2.push_front((u, w));
 
-            stack.push_front(Inst::Return(w, v, u));
-            stack.push_front(Inst::Init(u, w));
-        // stack2.push_front((u, w));
+            // return;
+            } else {
+                // println!("|{}|previously visited|{}|{}|{}|", state.count, w, v, u);
+                // (w, u) outgoing back-edge of w, i.e. dfs(w) > dfs(u)
+                if u != v && state.is_back_edge(w, u) {
+                    if state.pre[u] < state.lowpt[w] {
+                        state.absorb_path(w, state.next_on_path[w], None);
 
-        // return;
-        } else {
-            // println!("|{}|previously visited|{}|{}|{}|", state.count, w, v, u);
-            // (w, u) outgoing back-edge of w, i.e. dfs(w) > dfs(u)
-            if u != v && state.is_back_edge(w, u) {
-                if state.pre[u] < state.lowpt[w] {
-                    state.absorb_path(w, state.next_on_path[w], None);
+                        // P_w in paper
+                        state.next_on_path[w] = w;
+                        state.lowpt[w] = state.pre[u];
+                    }
+                // (w, u) incoming back-edge of w, i.e. dfs(u) > dfs(w)
+                } else if u != v {
+                    state.degrees[w] -= 2;
 
-                    // P_w in paper
-                    state.next_on_path[w] = w;
-                    state.lowpt[w] = state.pre[u];
-                }
-            // (w, u) incoming back-edge of w, i.e. dfs(u) > dfs(w)
-            } else if u != v {
-                state.degrees[w] -= 2;
+                    if !state.is_null_path(w) {
+                        let mut parent = w;
+                        let mut child = state.next_on_path[w];
 
-                if !state.is_null_path(w) {
-                    let mut parent = w;
-                    let mut child = state.next_on_path[w];
-
-                    while parent != child
+                        while parent != child
                         // child must have been visited before u
-                        && state.pre[child] <= state.pre[u]
+                            && state.pre[child] <= state.pre[u]
                         // u must have been visited before the
                         // children of child?
-                        && state.pre[u] <= state.pre[child] +
-                                           state.num_descendants[child] - 1
-                    {
-                        parent = child;
-                        child = state.next_on_path[child];
+                            && state.pre[u] <= state.pre[child] +
+                            state.num_descendants[child] - 1
+                        {
+                            parent = child;
+                            child = state.next_on_path[child];
+                        }
+
+                        // P_w[w..u] in paper
+                        state.absorb_path(
+                            w,
+                            state.next_on_path[w],
+                            Some(parent),
+                        );
+
+                        if state.is_null_path(parent) {
+                            state.next_on_path[w] = w;
+                        } else {
+                            state.next_on_path[w] = state.next_on_path[parent];
+                        }
                     }
-
-                    // P_w[w..u] in paper
-                    state.absorb_path(w, state.next_on_path[w], Some(parent));
-
-                    if state.is_null_path(parent) {
-                        state.next_on_path[w] = w;
-                    } else {
-                        state.next_on_path[w] = state.next_on_path[parent];
-                    }
                 }
-            }
 
-            // println!("|{}|visited, absorbed|{}|{}|{}|", state.count, w, v, u);
-        }
-    } else {
-        panic!("this is bad!");
-    }
-}
-
-fn return_inst(state: &mut State, inst: Inst) {
-    if let Inst::Return(w, v, u) = inst {
-        // println!("|{}|past recursion|{}|{}|{}|", state.count, w, v, u);
-        state.num_descendants[w] += state.num_descendants[u];
-
-        if state.degrees[u] <= 2 {
-            state.degrees[w] += state.degrees[u] - 2;
-
-            state.add_component(u);
-
-            if state.is_null_path(u) {
-                // P_u = w, in the paper
-                state.path_u = w;
-            } else {
-                // P_u = P_u - u, in the paper
-                // the path w + P_u is now null?
-                state.path_u = state.next_on_path[u];
-            }
-        } else {
-            // since degree[u] != 2, u can be absorbed
-            state.path_u = u;
-        }
-
-        if state.lowpt[w] <= state.lowpt[u] {
-            // w + P_u in paper
-            state.absorb_path(w, state.path_u, None);
-        } else {
-            state.lowpt[w] = state.lowpt[u];
-
-            // P_w in paper
-            state.absorb_path(w, state.next_on_path[w], None);
-            state.next_on_path[w] = state.path_u;
-        }
-    // println!("|{}|unvisited, absorbed|{}|{}|{}|", state.count, w, v, u);
-    } else {
-        panic!("shouldn't happen!");
-    }
-}
-
-// fn three_edge_step1(stacks: &mut graph: &Graph, state: &mut State, w: usize, v: usize) {
-
-// }
-
-fn three_edge_connect_new(graph: &Graph, state: &mut State) {
-    // function, w, v
-    // let mut stack: VecDeque<(usize, usize, usize)> = VecDeque::new();
-    let mut stack: Stack2 = VecDeque::new();
-
-    // let k = graph.keys().take(1).next().unwrap();
-
-    // type Stack = VecDeque<(usize, usize)>;
-    type Stack = VecDeque<(usize, usize, usize)>;
-    type WV = (usize, usize);
-    type UWV = (usize, usize, usize);
-    // let mut v = 0;
-
-    let nodes: Vec<_> = graph.keys().collect();
-
-    let connect = |state: &mut State, stack: &mut Stack2| {
-        // println!("{}\t-\tconnect", state.count);
-        // println!("{:?}", stack);
-        while let Some(inst) = stack.pop_front() {
-            match inst {
-                // init
-                Inst::Init(w, v) => {
-                    init_inst(state, graph, Inst::Init(w, v), stack);
-                }
-                // looping
-                Inst::Loop(w, v, u) => {
-                    loop_inst(state, graph, Inst::Loop(w, v, u), stack);
-                }
-                // returning
-                Inst::Return(w, v, u) => {
-                    return_inst(state, Inst::Return(w, v, u));
-                }
+                // println!("|{}|visited, absorbed|{}|{}|{}|", state.count, w, v, u);
             }
         }
-    };
-
-    for &n in nodes {
-        if !state.visited.contains(&n) {
-            stack.push_front(Inst::Init(n, 0));
-            // step1_stack.push_front((n, 0));
-            // println!("     stack - stack");
-            // println!("         1 - 2");
-            connect(state, &mut stack);
-            // connect(state, &mut step1_stack, &mut step2_stack);
-            /*
-            while !step1_stack.is_empty() || !step2_stack.is_empty() {
-                if !step1_stack.is_empty() {
-                    let (w, v) = step1_stack.pop_front().unwrap();
-                    step1_fun(state, (w, v), &mut step1_stack, &mut step2_stack);
-                } else if !step2_stack.is_empty() {
-                    let (u, v) = step2_stack.pop_front().unwrap();
-                    step2_fun(state, (u, v));
-                }
-            }
-            */
-            state.add_component(n);
-        }
-    }
-    // match (step1_stack.pop_front(), step2_stack.pop_front()) {
-    //     (Some((w, v)), None) => {
-    //         step1_fun(state, (w, v), &mut step1_stack);
-    //     }
-    //     (None, Some((u, v))) => {
-    //         step2_fun(state, (u, v));
-    //     }
-    //     (Some((w1, v1)), Some((w2, v2))) => {
-    //         // step1_fun
-    //     }
-    //     (_, _) => {}
-    // }
-    // }
-
-    // state
-}
-
-fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
-    let printing = true;
-
-    // println!("|{}|visiting|{}|{}|-|", state.count, w, v);
-    state.visited.insert(w);
-    state.next_sigma[w] = w;
-    state.next_on_path[w] = w;
-    state.pre[w] = state.count;
-    state.lowpt[w] = state.count;
-    state.num_descendants[w] = 1;
-    state.count += 1;
-
-    // println!("{}", state.count);
-
-    let edges = &graph[&w];
-
-    for edge in edges {
-        let u = *edge;
-        // println!("|{}|looping|{}|{}|{}|", state.count, w, v, u);
-        state.degrees[w] += 1;
-
-        if !state.visited.contains(&u) {
-            // println!("|{}|unvisited|{}|{}|{}|", state.count, w, v, u);
-            // if printing {
-            //     println!("|recursing from|{}|{}|", w, v);
-            // }
-            three_edge_connect(graph, state, u, w);
+        Inst::Return(w, v, u) => {
             // println!("|{}|past recursion|{}|{}|{}|", state.count, w, v, u);
-            // if printing {
-            //     println!("|past recursion|{}|{}|", w, v);
-            // }
             state.num_descendants[w] += state.num_descendants[u];
 
             if state.degrees[u] <= 2 {
@@ -465,63 +306,30 @@ fn three_edge_connect(graph: &Graph, state: &mut State, w: usize, v: usize) {
                 state.absorb_path(w, state.next_on_path[w], None);
                 state.next_on_path[w] = state.path_u;
             }
-        // println!("|{}|unvisited, absorbed|{}|{}|{}|", state.count, w, v, u);
-        } else {
-            // println!("|{}|previously visited|{}|{}|{}|", state.count, w, v, u);
-            // (w, u) outgoing back-edge of w, i.e. dfs(w) > dfs(u)
-            if u != v && state.is_back_edge(w, u) {
-                if state.pre[u] < state.lowpt[w] {
-                    state.absorb_path(w, state.next_on_path[w], None);
-
-                    // P_w in paper
-                    state.next_on_path[w] = w;
-                    state.lowpt[w] = state.pre[u];
-                }
-            // (w, u) incoming back-edge of w, i.e. dfs(u) > dfs(w)
-            } else if u != v {
-                state.degrees[w] -= 2;
-
-                if !state.is_null_path(w) {
-                    let mut parent = w;
-                    let mut child = state.next_on_path[w];
-
-                    while parent != child
-                        // child must have been visited before u
-                        && state.pre[child] <= state.pre[u]
-                        // u must have been visited before the
-                        // children of child?
-                        && state.pre[u] <= state.pre[child] +
-                                           state.num_descendants[child] - 1
-                    {
-                        parent = child;
-                        child = state.next_on_path[child];
-                    }
-
-                    // P_w[w..u] in paper
-                    state.absorb_path(w, state.next_on_path[w], Some(parent));
-
-                    if state.is_null_path(parent) {
-                        state.next_on_path[w] = w;
-                    } else {
-                        state.next_on_path[w] = state.next_on_path[parent];
-                    }
-                }
-            }
-
-            // println!("|{}|visited, absorbed|{}|{}|{}|", state.count, w, v, u);
+            // println!("|{}|unvisited, absorbed|{}|{}|{}|", state.count, w, v, u);
         }
-
-        // if printing {
-        //     println!("|end of if|{}|{}|", w, v);
-        // }
     }
-    // println!("|{}|returning|{}|{}|-|", state.count, w, v);
+}
+
+fn three_edge_connect(graph: &Graph, state: &mut State) {
+    let mut stack: InstStack = VecDeque::new();
+
+    let nodes: Vec<_> = graph.keys().collect();
+    for &n in nodes {
+        if !state.visited.contains(&n) {
+            stack.push_front(Inst::Init(n, 0));
+            while let Some(inst) = stack.pop_front() {
+                run_inst(inst, &mut stack, state, graph);
+            }
+            state.add_component(n);
+        }
+    }
 }
 
 /// Prints each component, one per row, with space-delimited GFA
-/// segment names, in the arbitrary HashMap order
+/// segment names, in the BTreeMap order
 fn print_components(
-    inv_name_map: &HashMap<usize, String>,
+    inv_name_arr: &[String],
     sigma: &BTreeMap<usize, BTreeSet<usize>>,
 ) {
     for (_k, component) in sigma {
@@ -529,24 +337,8 @@ fn print_components(
             if i > 0 {
                 print!("\t");
             }
-            let name = &inv_name_map[&j];
+            let name = &inv_name_arr[*j];
             print!("{}", name);
-        }
-        println!();
-    }
-}
-
-fn print_components_compat(
-    inv_name_map: &HashMap<usize, String>,
-    sigma: &BTreeMap<usize, BTreeSet<usize>>,
-) {
-    println!("# of components: {}", sigma.len());
-    for (_k, v) in sigma {
-        print!("component: ");
-        for s in v {
-            if *s != 0 {
-                print!(" {}", inv_name_map[s]);
-            }
         }
         println!();
     }
@@ -557,24 +349,23 @@ fn main() {
 
     let path = PathBuf::from(&args[1]);
 
-    let gfa = parse_gfa(&path).unwrap();
+    let algraph = {
+        let gfa = {
+            let tmp = parse_gfa(&path).unwrap();
 
-    let algraph = ALGraph::from_gfa(&gfa);
+            GFA {
+                version: None,
+                segments: Vec::new(),
+                links: tmp.links,
+                containments: Vec::new(),
+                paths: Vec::new(),
+            }
+        };
+
+        ALGraph::from_gfa(&gfa)
+    };
 
     let mut state = State::initialize(&algraph.graph);
-
-    let nodes: Vec<_> = algraph.graph.keys().collect();
-
-    three_edge_connect_new(&algraph.graph, &mut state);
-    // for &n in nodes {
-    //     if !state.visited.contains(&n) {
-    //         three_edge_connect(&algraph.graph, &mut state, n, 0);
-    //         state.add_component(n);
-    //     }
-    // }
-
-    // println!("# components: {}", state.sigma.len());
-
-    print_components(&algraph.inv_name_map, &state.sigma);
-    // print_components_compat(&algraph.inv_name_map, &state.sigma);
+    three_edge_connect(&algraph.graph, &mut state);
+    print_components(&algraph.inv_names, &state.sigma);
 }
