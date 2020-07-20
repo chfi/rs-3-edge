@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use crate::graph::Graph;
 
 #[derive(Default, Debug, Clone)]
@@ -7,7 +5,7 @@ pub struct State {
     pub degrees: Vec<isize>,
     pub next_sigma: Vec<usize>,
     pub next_on_path: Vec<usize>,
-    pub visited: BTreeSet<usize>,
+    pub visited: Vec<bool>,
     pub pre: Vec<usize>,
     pub lowpt: Vec<usize>,
     pub count: usize,
@@ -28,7 +26,7 @@ impl State {
             lowpt: vec![0; num_nodes],
             num_descendants: vec![0; num_nodes],
             degrees: vec![0; num_nodes],
-            visited: BTreeSet::new(),
+            visited: vec![false; num_nodes],
             sigma: Vec::new(),
             path_u: 0,
         }

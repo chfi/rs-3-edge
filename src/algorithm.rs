@@ -20,7 +20,7 @@ fn run_inst(
 ) {
     match inst {
         Inst::Recur(w, v) => {
-            state.visited.insert(w);
+            state.visited[w] = true;
             state.next_sigma[w] = w;
             state.next_on_path[w] = w;
             state.pre[w] = state.count;
@@ -36,7 +36,7 @@ fn run_inst(
         Inst::Loop(w, v, u) => {
             state.degrees[w] += 1;
 
-            if !state.visited.contains(&u) {
+            if !state.visited[u] {
                 stack.push_front(Inst::Return(w, u));
                 stack.push_front(Inst::Recur(u, w));
             } else {
@@ -116,7 +116,7 @@ pub fn three_edge_connect(graph: &Graph, state: &mut State) {
 
     let nodes: Vec<_> = graph.keys().collect();
     for &n in nodes {
-        if !state.visited.contains(&n) {
+        if !state.visited[n] {
             stack.push_front(Inst::Recur(n, 0));
             while let Some(inst) = stack.pop_front() {
                 run_inst(inst, &mut stack, state, graph);
