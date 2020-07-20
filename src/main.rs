@@ -56,11 +56,8 @@ impl ALGraph {
         use gfa::gfa::Line;
         for line in gfa_lines {
             if let Line::Link(link) = line {
-                let from = &link.from_segment;
-                let to = &link.to_segment;
-
-                let from_ix = get_ix(from);
-                let to_ix = get_ix(to);
+                let from_ix = get_ix(&link.from_segment);
+                let to_ix = get_ix(&link.to_segment);
 
                 graph.entry(from_ix).or_default().push(to_ix);
                 graph.entry(to_ix).or_default().push(from_ix);
@@ -124,9 +121,10 @@ impl<'a> Iterator for SigmaIter<'a> {
 
 impl State {
     fn initialize(graph: &Graph) -> State {
-        let num_nodes = graph.len() + 1;
+        let num_nodes = graph.len();
 
         State {
+            count: 1,
             next_sigma: vec![0; num_nodes],
             next_on_path: vec![0; num_nodes],
             pre: vec![0; num_nodes],
@@ -134,9 +132,8 @@ impl State {
             num_descendants: vec![0; num_nodes],
             degrees: vec![0; num_nodes],
             visited: BTreeSet::new(),
-            path_u: 0,
-            count: 1,
             sigma: BTreeMap::new(),
+            path_u: 0,
         }
     }
 
@@ -154,11 +151,8 @@ impl State {
             let mut step = path;
             while current != step {
                 self.degrees[root] += self.degrees[step] - 2;
-
                 self.next_sigma.swap(root, step);
-
                 current = step;
-
                 if Some(step) != end {
                     step = self.next_on_path[step];
                 }
@@ -177,9 +171,9 @@ impl State {
 
 #[derive(Debug)]
 enum Inst {
-    Init(usize, usize),
+    Recur(usize, usize),
     Loop(usize, usize, usize),
-    Return(usize, usize, usize),
+    Return(usize, usize),
 }
 
 type InstStack = VecDeque<Inst>;
@@ -191,7 +185,7 @@ fn run_inst(
     graph: &Graph,
 ) {
     match inst {
-        Inst::Init(w, v) => {
+        Inst::Recur(w, v) => {
             state.visited.insert(w);
             state.next_sigma[w] = w;
             state.next_on_path[w] = w;
@@ -200,31 +194,23 @@ fn run_inst(
             state.num_descendants[w] = 1;
             state.count += 1;
 
-            let mut neighbors: Vec<_> = graph[&w].iter().collect();
-            neighbors.reverse();
-            for edge in neighbors {
-                // println!("pushin Loop{}, {}, {}", w, v, edge);
-                stack.push_front(Inst::Loop(w, v, *edge));
-            }
+            graph[&w]
+                .iter()
+                .rev()
+                .for_each(|edge| stack.push_front(Inst::Loop(w, v, *edge)));
         }
         Inst::Loop(w, v, u) => {
-            // println!("|{}|looping|{}|{}|{}|", state.count, w, v, u);
             state.degrees[w] += 1;
 
             if !state.visited.contains(&u) {
-                // println!("|{}|unvisited|{}|{}|{}|", state.count, w, v, u);
-
-                stack.push_front(Inst::Return(w, v, u));
-                stack.push_front(Inst::Init(u, w));
+                stack.push_front(Inst::Return(w, u));
+                stack.push_front(Inst::Recur(u, w));
             } else {
-                // println!("|{}|previously visited|{}|{}|{}|", state.count, w, v, u);
                 // (w, u) outgoing back-edge of w, i.e. dfs(w) > dfs(u)
                 if u != v && state.is_back_edge(w, u) {
                     if state.pre[u] < state.lowpt[w] {
                         state.absorb_path(w, state.next_on_path[w], None);
-
-                        // P_w in paper
-                        state.next_on_path[w] = w;
+                        state.next_on_path[w] = w; // P_w in paper
                         state.lowpt[w] = state.pre[u];
                     }
                 // (w, u) incoming back-edge of w, i.e. dfs(u) > dfs(w)
@@ -235,13 +221,11 @@ fn run_inst(
                         let mut parent = w;
                         let mut child = state.next_on_path[w];
 
-                        while parent != child
-                        // child must have been visited before u
+                        while !state.is_null_path(parent)
                             && state.pre[child] <= state.pre[u]
-                        // u must have been visited before the
-                        // children of child?
-                            && state.pre[u] <= state.pre[child] +
-                            state.num_descendants[child] - 1
+                        // child must have been visited before u
+                            && state.pre[u] < state.pre[child] + state.num_descendants[child]
+                        // child is still an ancestor of u
                         {
                             parent = child;
                             child = state.next_on_path[child];
@@ -254,34 +238,27 @@ fn run_inst(
                             Some(parent),
                         );
 
-                        if state.is_null_path(parent) {
-                            state.next_on_path[w] = w;
+                        state.next_on_path[w] = if state.is_null_path(parent) {
+                            w
                         } else {
-                            state.next_on_path[w] = state.next_on_path[parent];
+                            state.next_on_path[parent]
                         }
                     }
                 }
-
-                // println!("|{}|visited, absorbed|{}|{}|{}|", state.count, w, v, u);
             }
         }
-        Inst::Return(w, _v, u) => {
-            // println!("|{}|past recursion|{}|{}|{}|", state.count, w, v, u);
+        Inst::Return(w, u) => {
             state.num_descendants[w] += state.num_descendants[u];
 
             if state.degrees[u] <= 2 {
                 state.degrees[w] += state.degrees[u] - 2;
-
                 state.add_component(u);
 
-                if state.is_null_path(u) {
-                    // P_u = w, in the paper
-                    state.path_u = w;
+                state.path_u = if state.is_null_path(u) {
+                    w // P_u = w + P_u
                 } else {
-                    // P_u = P_u - u, in the paper
-                    // the path w + P_u is now null?
-                    state.path_u = state.next_on_path[u];
-                }
+                    state.next_on_path[u] // P_u
+                };
             } else {
                 // since degree[u] != 2, u can be absorbed
                 state.path_u = u;
@@ -292,12 +269,10 @@ fn run_inst(
                 state.absorb_path(w, state.path_u, None);
             } else {
                 state.lowpt[w] = state.lowpt[u];
-
                 // P_w in paper
                 state.absorb_path(w, state.next_on_path[w], None);
                 state.next_on_path[w] = state.path_u;
             }
-            // println!("|{}|unvisited, absorbed|{}|{}|{}|", state.count, w, v, u);
         }
     }
 }
@@ -308,7 +283,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State) {
     let nodes: Vec<_> = graph.keys().collect();
     for &n in nodes {
         if !state.visited.contains(&n) {
-            stack.push_front(Inst::Init(n, 0));
+            stack.push_front(Inst::Recur(n, 0));
             while let Some(inst) = stack.pop_front() {
                 run_inst(inst, &mut stack, state, graph);
             }
@@ -318,7 +293,7 @@ fn three_edge_connect(graph: &Graph, state: &mut State) {
 }
 
 /// Prints each component, one per row, with space-delimited GFA
-/// segment names, in the BTreeMap order
+/// segment names, in the BTreeMap node order
 fn print_components(
     inv_name_arr: &[String],
     sigma: &BTreeMap<usize, BTreeSet<usize>>,
