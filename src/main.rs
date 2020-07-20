@@ -7,7 +7,7 @@ use three_edge_connected::state::State;
 
 /// Prints each component, one per row, with space-delimited GFA
 /// segment names, in the BTreeMap node order
-fn print_components(inv_name_arr: &[String], sigma: &Vec<(usize, Vec<usize>)>) {
+fn print_components(inv_name_arr: &[String], sigma: &[(usize, Vec<usize>)]) {
     for (_k, component) in sigma {
         for (i, j) in component.iter().enumerate() {
             if i > 0 {

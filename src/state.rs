@@ -24,7 +24,7 @@ impl State {
             next_on_path: vec![0; num_nodes],
             pre: vec![0; num_nodes],
             lowpt: vec![0; num_nodes],
-            num_descendants: vec![0; num_nodes],
+            num_descendants: vec![1; num_nodes],
             degrees: vec![0; num_nodes],
             visited: vec![false; num_nodes],
             sigma: Vec::new(),
@@ -64,7 +64,7 @@ impl State {
         }
     }
 
-    pub fn sigma_iter<'a>(&'a self, start: usize) -> SigmaIter<'a> {
+    pub fn sigma_iter(&self, start: usize) -> SigmaIter<'_> {
         SigmaIter::new(self, start)
     }
 
@@ -87,7 +87,7 @@ impl<'a> SigmaIter<'a> {
         SigmaIter {
             start: node,
             current: next_sigma[node],
-            next_sigma: next_sigma,
+            next_sigma,
             done: false,
         }
     }

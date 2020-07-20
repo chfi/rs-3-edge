@@ -25,7 +25,6 @@ fn run_inst(
             state.next_on_path[w] = w;
             state.pre[w] = state.count;
             state.lowpt[w] = state.count;
-            state.num_descendants[w] = 1;
             state.count += 1;
 
             graph[&w]
