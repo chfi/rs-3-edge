@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use crate::graph::Graph;
@@ -14,7 +13,7 @@ pub struct State {
     pub count: usize,
     pub num_descendants: Vec<usize>,
     pub path_u: usize,
-    pub sigma: BTreeMap<usize, BTreeSet<usize>>,
+    pub sigma: Vec<(usize, Vec<usize>)>,
 }
 
 impl State {
@@ -30,12 +29,12 @@ impl State {
             num_descendants: vec![0; num_nodes],
             degrees: vec![0; num_nodes],
             visited: BTreeSet::new(),
-            sigma: BTreeMap::new(),
+            sigma: Vec::new(),
             path_u: 0,
         }
     }
 
-    pub fn components(&self) -> &BTreeMap<usize, BTreeSet<usize>> {
+    pub fn components(&self) -> &Vec<(usize, Vec<usize>)> {
         &self.sigma
     }
 
@@ -72,7 +71,7 @@ impl State {
     }
 
     pub fn add_component(&mut self, start: usize) {
-        self.sigma.insert(start, self.sigma_iter(start).collect());
+        self.sigma.push((start, self.sigma_iter(start).collect()));
     }
 }
 
