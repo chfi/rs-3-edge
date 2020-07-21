@@ -11,7 +11,7 @@ pub struct State {
     pub count: usize,
     pub num_descendants: Vec<usize>,
     pub path_u: usize,
-    pub sigma: Vec<(usize, Vec<usize>)>,
+    pub sigma: Vec<Vec<usize>>,
 }
 
 impl State {
@@ -32,7 +32,7 @@ impl State {
         }
     }
 
-    pub fn components(&self) -> &Vec<(usize, Vec<usize>)> {
+    pub fn components(&self) -> &Vec<Vec<usize>> {
         &self.sigma
     }
 
@@ -69,7 +69,7 @@ impl State {
     }
 
     pub fn add_component(&mut self, start: usize) {
-        self.sigma.push((start, self.sigma_iter(start).collect()));
+        self.sigma.push(self.sigma_iter(start).collect());
     }
 }
 
