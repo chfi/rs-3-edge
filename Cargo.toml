@@ -10,3 +10,4 @@ readme = "readme.md"
 
 [dependencies]
 gfa = "0.4"
+structopt = "0.3"

@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::graph::Graph;
+use crate::graph::BTreeGraph;
 use crate::state::State;
 
 #[derive(Debug)]
@@ -16,7 +16,7 @@ fn run_inst(
     inst: Inst,
     stack: &mut InstStack,
     state: &mut State,
-    graph: &Graph,
+    graph: &BTreeGraph,
 ) {
     match inst {
         Inst::Recur(w, v) => {
@@ -110,11 +110,10 @@ fn run_inst(
     }
 }
 
-pub fn three_edge_connect(graph: &Graph, state: &mut State) {
+pub fn three_edge_connect(graph: &BTreeGraph, state: &mut State) {
     let mut stack: InstStack = VecDeque::new();
 
-    let nodes: Vec<_> = graph.keys().collect();
-    for &n in nodes {
+    for &n in graph.keys() {
         if !state.visited[n] {
             stack.push_front(Inst::Recur(n, 0));
             while let Some(inst) = stack.pop_front() {

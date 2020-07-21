@@ -2,8 +2,10 @@ use std::env;
 use std::io::Write;
 use std::path::PathBuf;
 
+use structopt::StructOpt;
+
 use three_edge_connected::algorithm;
-use three_edge_connected::graph::ALGraph;
+use three_edge_connected::graph::Graph;
 use three_edge_connected::state::State;
 
 /// Prints each component, one per row, with space-delimited GFA
