@@ -1,4 +1,5 @@
 use std::env;
+use std::io::Write;
 use std::path::PathBuf;
 
 use three_edge_connected::algorithm;
@@ -7,16 +8,20 @@ use three_edge_connected::state::State;
 
 /// Prints each component, one per row, with space-delimited GFA
 /// segment names, in the BTreeMap node order
-fn print_components(inv_name_arr: &[String], sigma: &[(usize, Vec<usize>)]) {
-    for (_k, component) in sigma {
-        for (i, j) in component.iter().enumerate() {
+fn write_components<T: Write>(
+    stream: &mut T,
+    inv_names: &[String],
+    components: &[Vec<usize>],
+) {
+    for component in components {
+        component.iter().enumerate().for_each(|(i, j)| {
             if i > 0 {
-                print!("\t");
+                write!(stream, "\t{}", inv_names[*j]).unwrap();
+            } else {
+                write!(stream, "{}", inv_names[*j]).unwrap();
             }
-            let name = &inv_name_arr[*j];
-            print!("{}", name);
-        }
-        println!();
+        });
+        writeln!(stream).unwrap();
     }
 }
 
@@ -29,5 +34,6 @@ fn main() {
 
     algorithm::three_edge_connect(&algraph.graph, &mut state);
 
-    print_components(&algraph.inv_names, state.components());
+    let mut stdo = std::io::stdout();
+    write_components(&mut stdo, &algraph.inv_names, state.components());
 }
