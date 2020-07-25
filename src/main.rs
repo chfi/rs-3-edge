@@ -3,6 +3,7 @@ use std::io::prelude::*;
 use std::io::{BufReader, BufWriter, Write};
 use std::path::PathBuf;
 
+use bstr::BString;
 use structopt::StructOpt;
 
 use three_edge_connected::algorithm;
@@ -32,7 +33,7 @@ struct Opt {
 /// segment names, in the node index order
 fn write_components<T: Write>(
     stream: &mut T,
-    inv_names: &[String],
+    inv_names: &[BString],
     components: &[Vec<usize>],
 ) {
     for component in components {
