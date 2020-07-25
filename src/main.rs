@@ -37,14 +37,16 @@ fn write_components<T: Write>(
     components: &[Vec<usize>],
 ) {
     for component in components {
-        component.iter().enumerate().for_each(|(i, j)| {
-            if i > 0 {
-                write!(stream, "\t{}", inv_names[*j]).unwrap();
-            } else {
-                write!(stream, "{}", inv_names[*j]).unwrap();
-            }
-        });
-        writeln!(stream).unwrap();
+        if component.len() > 1 {
+            component.iter().enumerate().for_each(|(i, j)| {
+                if i > 0 {
+                    write!(stream, "\t{}", inv_names[*j]).unwrap();
+                } else {
+                    write!(stream, "{}", inv_names[*j]).unwrap();
+                }
+            });
+            writeln!(stream).unwrap();
+        }
     }
 }
 
