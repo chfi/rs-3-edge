@@ -32,6 +32,18 @@ impl State {
         }
     }
 
+    pub fn mut_recur(&mut self, w: usize) {
+        assert!(w < self.visited.len());
+        unsafe {
+            *self.visited.get_unchecked_mut(w) = true;
+            *self.next_sigma.get_unchecked_mut(w) = w;
+            *self.next_on_path.get_unchecked_mut(w) = w;
+            *self.pre.get_unchecked_mut(w) = self.count;
+            *self.lowpt.get_unchecked_mut(w) = self.count;
+        }
+        self.count += 1;
+    }
+
     pub fn components(&self) -> &Vec<Vec<usize>> {
         &self.sigma
     }
@@ -54,11 +66,20 @@ impl State {
             let mut current = root;
             let mut step = path;
             while current != step {
-                self.degrees[root] += self.degrees[step] - 2;
-                self.next_sigma.swap(root, step);
-                current = step;
-                if Some(step) != end {
-                    step = self.next_on_path[step];
+                unsafe {
+                    *self.degrees.get_unchecked_mut(root) +=
+                        *self.degrees.get_unchecked_mut(step) - 2;
+                    self.next_sigma.swap(root, step);
+                    current = step;
+                    if Some(step) != end {
+                        step = *self.next_on_path.get_unchecked(step);
+                    }
+                    // self.degrees[root] += self.degrees[step] - 2;
+                    // self.next_sigma.swap(root, step);
+                    // current = step;
+                    // if Some(step) != end {
+                    //     step = self.next_on_path[step];
+                    // }
                 }
             }
         }
