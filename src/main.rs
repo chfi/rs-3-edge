@@ -1,14 +1,13 @@
-use std::fs::File;
-use std::io::prelude::*;
-use std::io::{BufReader, BufWriter, Write};
-use std::path::PathBuf;
+use std::{
+    fs::File,
+    io::{prelude::*, BufReader, BufWriter, Write},
+    path::PathBuf,
+};
 
 use bstr::BString;
 use structopt::StructOpt;
 
-use three_edge_connected::algorithm;
-use three_edge_connected::graph::Graph;
-use three_edge_connected::state::State;
+use three_edge_connected::Graph;
 
 /// Finds the 3-edge-connected components in a graph. Input must be a
 /// bridgeless graph in the GFA format. Output is a list of
@@ -67,9 +66,7 @@ fn main() {
 
     let graph = Graph::from_gfa_reader(&mut in_handle);
 
-    let mut state = State::initialize(&graph.graph);
-
-    algorithm::three_edge_connect(&graph.graph, &mut state);
+    let components = three_edge_connected::find_components(&graph.graph);
 
     let mut out_handle: Box<dyn Write> = {
         match opt.out_file {
@@ -83,5 +80,5 @@ fn main() {
         }
     };
 
-    write_components(&mut out_handle, &graph.inv_names, state.components());
+    write_components(&mut out_handle, &graph.inv_names, &components);
 }

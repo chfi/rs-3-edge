@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::graph::BTreeGraph;
-use crate::state::State;
+use crate::{graph::BTreeGraph, state::State};
 
 #[derive(Debug)]
 enum Inst {
@@ -124,7 +123,7 @@ fn run_inst(
     }
 }
 
-pub fn three_edge_connect(graph: &BTreeGraph, state: &mut State) {
+fn three_edge_connect(graph: &BTreeGraph, state: &mut State) {
     let mut stack: InstStack = VecDeque::new();
 
     for &n in graph.keys() {
@@ -136,4 +135,10 @@ pub fn three_edge_connect(graph: &BTreeGraph, state: &mut State) {
             state.add_component(n);
         }
     }
+}
+
+pub fn find_components(graph: &BTreeGraph) -> Vec<Vec<usize>> {
+    let mut state = State::initialize(graph);
+    three_edge_connect(graph, &mut state);
+    state.sigma
 }
