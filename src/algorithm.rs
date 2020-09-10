@@ -34,17 +34,7 @@ fn run_inst(
 ) {
     match inst {
         Inst::Recur(w, v) => {
-            // assert_state_len!(state, w);
-            // assert_state_len!(state, v);
-            // assert!(w < state.visited.len() && v < state.visited.len());
-            // state.visited.get_mut(w).map(|_| true);
             state.mut_recur(w);
-            // state.visited[w] = true;
-            // state.next_sigma[w] = w;
-            // state.next_on_path[w] = w;
-            // state.pre[w] = state.count;
-            // state.lowpt[w] = state.count;
-            // state.count += 1;
 
             graph[&w]
                 .iter()
@@ -55,7 +45,6 @@ fn run_inst(
             assert_state_len!(state, w);
             assert_state_len!(state, v);
             assert_state_len!(state, u);
-            // assert!(w < state.len() && v < state.len() && u < state.len());
             state.degrees[w] += 1;
 
             if !state.visited[u] {
@@ -106,7 +95,6 @@ fn run_inst(
         Inst::Return(w, u) => {
             assert_state_len!(state, w);
             assert_state_len!(state, u);
-            // assert!(w < state.len() && u < state.len());
             state.num_descendants[w] += state.num_descendants[u];
 
             if state.degrees[u] <= 2 {
