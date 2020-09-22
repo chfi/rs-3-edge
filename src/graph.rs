@@ -5,7 +5,7 @@ use std::{
 
 use bstr::{io::*, BStr, BString};
 
-use gfa::parser::{GFAParser, GFAParsingConfig};
+use gfa::parser::{GFAParser, GFAParserBuilder};
 
 pub type AdjacencyList = Vec<usize>;
 pub type BTreeGraph = BTreeMap<usize, AdjacencyList>;
@@ -64,13 +64,14 @@ impl Graph<BString> {
     pub fn from_gfa_reader<T: BufRead>(reader: &mut T) -> Graph<BString> {
         let lines = &mut reader.byte_lines();
 
-        let conf = GFAParsingConfig {
+        let parser: GFAParser<BString, ()> = GFAParserBuilder {
             links: true,
-            ..GFAParsingConfig::none()
-        };
-        let parser: GFAParser<()> = GFAParser::with_config(conf);
+            ..GFAParserBuilder::none()
+        }
+        .build();
+
         let gfa_lines =
-            lines.filter_map(move |l| parser.parse_line(&l.unwrap()));
+            lines.filter_map(move |l| parser.parse_line_bytes(&l.unwrap()));
 
         let mut graph: BTreeMap<usize, AdjacencyList> = BTreeMap::new();
         let mut name_map: HashMap<BString, usize> = HashMap::new();
