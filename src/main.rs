@@ -66,7 +66,8 @@ fn main() {
 
     let graph = Graph::from_gfa_reader(&mut in_handle);
 
-    let components = three_edge_connected::find_components(&graph.graph);
+    let (components, bridges) =
+        three_edge_connected::find_components(&graph.graph);
 
     let mut out_handle: Box<dyn Write> = {
         match opt.out_file {

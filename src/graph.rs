@@ -104,7 +104,10 @@ impl Graph<BString> {
 
 impl<N: Clone> Graph<N> {
     /// Given a vector of graph components (as produced by
-    pub fn invert_components(&self, components: Vec<&[usize]>) -> Vec<Vec<N>> {
+    pub fn invert_components(
+        &self,
+        components: Vec<Vec<usize>>,
+    ) -> Vec<Vec<N>> {
         components.into_iter().filter_map(|c|{
             let len = c.len();
             if len > 1 {
