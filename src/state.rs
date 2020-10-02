@@ -12,7 +12,6 @@ pub struct State {
     pub num_descendants: Vec<usize>,
     pub path_u: usize,
     pub sigma: Vec<Vec<usize>>,
-    pub bridges: Vec<(usize, usize)>,
 }
 
 impl State {
@@ -30,7 +29,6 @@ impl State {
             visited: vec![false; num_nodes],
             sigma: Vec::new(),
             path_u: 0,
-            bridges: Vec::new(),
         }
     }
 

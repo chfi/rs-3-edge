@@ -71,7 +71,7 @@ impl Graph<BString> {
         .build();
 
         let gfa_lines =
-            lines.filter_map(move |l| parser.parse_line_bytes(&l.unwrap()));
+            lines.filter_map(move |l| parser.parse_gfa_line(&l.unwrap()).ok());
 
         let mut graph: BTreeMap<usize, AdjacencyList> = BTreeMap::new();
         let mut name_map: HashMap<BString, usize> = HashMap::new();

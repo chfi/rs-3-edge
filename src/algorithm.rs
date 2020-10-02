@@ -119,10 +119,6 @@ fn run_inst(
                 state.absorb_path(w, state.next_on_path[w], None);
                 state.next_on_path[w] = state.path_u;
             }
-
-            if state.lowpt[u] == state.pre[u] {
-                state.bridges.push((w, u));
-            }
         }
     }
 }
@@ -141,10 +137,8 @@ fn three_edge_connect(graph: &BTreeGraph, state: &mut State) {
     }
 }
 
-pub fn find_components(
-    graph: &BTreeGraph,
-) -> (Vec<Vec<usize>>, Vec<(usize, usize)>) {
+pub fn find_components(graph: &BTreeGraph) -> Vec<Vec<usize>> {
     let mut state = State::initialize(graph);
     three_edge_connect(graph, &mut state);
-    (state.sigma, state.bridges)
+    state.sigma
 }
