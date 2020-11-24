@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
 };
 
-use bstr::BString;
+use bstr::ByteSlice;
 use structopt::StructOpt;
 
 use three_edge_connected::Graph;
@@ -32,16 +32,16 @@ struct Opt {
 /// segment names, in the node index order
 fn write_components<T: Write>(
     stream: &mut T,
-    inv_names: &[BString],
+    inv_names: &[Vec<u8>],
     components: &[Vec<usize>],
 ) {
     for component in components {
         if component.len() > 1 {
             component.iter().enumerate().for_each(|(i, j)| {
                 if i > 0 {
-                    write!(stream, "\t{}", inv_names[*j]).unwrap();
+                    write!(stream, "\t{}", inv_names[*j].as_bstr()).unwrap();
                 } else {
-                    write!(stream, "{}", inv_names[*j]).unwrap();
+                    write!(stream, "{}", inv_names[*j].as_bstr()).unwrap();
                 }
             });
             writeln!(stream).unwrap();

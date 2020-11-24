@@ -1,6 +1,6 @@
 [package]
 name = "three-edge-connected"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["christian@chfi.se"]
 edition = "2018"
 license = "MIT"
@@ -12,6 +12,7 @@ keywords = ["graph"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-gfa = "0.8"
+gfa = "0.9"
 structopt = "0.3"
 bstr = "0.2"
+fxhash = "0.2"

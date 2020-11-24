@@ -1,14 +1,13 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    io::prelude::*,
-};
+use std::io::prelude::*;
 
-use bstr::{io::*, BStr, BString};
+use fxhash::FxHashMap;
+
+use bstr::io::*;
 
 use gfa::parser::{GFAParser, GFAParserBuilder};
 
 pub type AdjacencyList = Vec<usize>;
-pub type BTreeGraph = BTreeMap<usize, AdjacencyList>;
+pub type FxMapGraph = FxHashMap<usize, AdjacencyList>;
 
 /// An adjacency list representation of a generic graph, including the
 /// map required to go from node index to the original node name. The
@@ -16,7 +15,7 @@ pub type BTreeGraph = BTreeMap<usize, AdjacencyList>;
 /// `BString` for GFA graphs, or `usize` for graphs that use integer
 /// names.
 pub struct Graph<N> {
-    pub graph: BTreeGraph,
+    pub graph: FxMapGraph,
     pub inv_names: Vec<N>,
 }
 
@@ -29,8 +28,8 @@ impl Graph<usize> {
     where
         I: Iterator<Item = (usize, usize)>,
     {
-        let mut graph: BTreeMap<usize, AdjacencyList> = BTreeMap::new();
-        let mut name_map: HashMap<usize, usize> = HashMap::new();
+        let mut graph: FxHashMap<usize, AdjacencyList> = FxHashMap::default();
+        let mut name_map: FxHashMap<usize, usize> = FxHashMap::default();
         let mut inv_names = Vec::new();
 
         let mut get_ix = |name: usize| {
@@ -56,15 +55,15 @@ impl Graph<usize> {
     }
 }
 
-impl Graph<BString> {
+impl Graph<Vec<u8>> {
     /// Constructs an adjacency list representation of the given GFA
     /// file input stream, parsing the GFA line-by-line and only
     /// keeping the links. Returns the graph as an adjacency list and
     /// a map from graph indices to GFA segment names.
-    pub fn from_gfa_reader<T: BufRead>(reader: &mut T) -> Graph<BString> {
+    pub fn from_gfa_reader<T: BufRead>(reader: &mut T) -> Graph<Vec<u8>> {
         let lines = &mut reader.byte_lines();
 
-        let parser: GFAParser<BString, ()> = GFAParserBuilder {
+        let parser: GFAParser<Vec<u8>, ()> = GFAParserBuilder {
             links: true,
             ..GFAParserBuilder::none()
         }
@@ -73,11 +72,11 @@ impl Graph<BString> {
         let gfa_lines =
             lines.filter_map(move |l| parser.parse_gfa_line(&l.unwrap()).ok());
 
-        let mut graph: BTreeMap<usize, AdjacencyList> = BTreeMap::new();
-        let mut name_map: HashMap<BString, usize> = HashMap::new();
+        let mut graph: FxHashMap<usize, AdjacencyList> = FxHashMap::default();
+        let mut name_map: FxHashMap<Vec<u8>, usize> = FxHashMap::default();
         let mut inv_names = Vec::new();
 
-        let mut get_ix = |name: &BStr| {
+        let mut get_ix = |name: &[u8]| {
             if let Some(ix) = name_map.get(name) {
                 *ix
             } else {

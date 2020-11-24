@@ -1,4 +1,4 @@
-use crate::graph::BTreeGraph;
+use crate::graph::FxMapGraph;
 
 #[derive(Default, Debug, Clone)]
 pub struct State {
@@ -15,7 +15,7 @@ pub struct State {
 }
 
 impl State {
-    pub fn initialize(graph: &BTreeGraph) -> State {
+    pub fn initialize(graph: &FxMapGraph) -> State {
         let num_nodes = graph.len();
 
         State {

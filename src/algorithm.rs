@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::{graph::BTreeGraph, state::State};
+use crate::{graph::FxMapGraph, state::State};
 
 #[derive(Debug)]
 enum Inst {
@@ -29,7 +29,7 @@ fn run_inst(
     inst: Inst,
     stack: &mut InstStack,
     state: &mut State,
-    graph: &BTreeGraph,
+    graph: &FxMapGraph,
 ) {
     match inst {
         Inst::Recur(w, v) => {
@@ -123,7 +123,7 @@ fn run_inst(
     }
 }
 
-fn three_edge_connect(graph: &BTreeGraph, state: &mut State) {
+fn three_edge_connect(graph: &FxMapGraph, state: &mut State) {
     let mut stack: InstStack = VecDeque::new();
 
     for &n in graph.keys() {
@@ -137,7 +137,7 @@ fn three_edge_connect(graph: &BTreeGraph, state: &mut State) {
     }
 }
 
-pub fn find_components(graph: &BTreeGraph) -> Vec<Vec<usize>> {
+pub fn find_components(graph: &FxMapGraph) -> Vec<Vec<usize>> {
     let mut state = State::initialize(graph);
     three_edge_connect(graph, &mut state);
     state.sigma
