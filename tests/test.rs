@@ -3,6 +3,41 @@ use three_edge_connected::{algorithm, Graph};
 /// Tests the correctness of the algorithm by running it against
 /// graphs for which the 3EC components are known
 
+fn k_graph_edges(offset: usize, n: usize) -> Vec<(usize, usize)> {
+    let mut edges = Vec::new();
+
+    let start = offset;
+    let end = offset + n;
+
+    for i in start..end {
+        for j in i..end {
+            if i != j {
+                edges.push((i, j));
+            }
+        }
+    }
+
+    edges
+}
+
+fn bridged_k_graphs(k_a: usize, k_b: usize, bridges: usize) -> Graph<usize> {
+    let a_edges = k_graph_edges(0, k_a);
+    let last_a = a_edges.last().unwrap().1;
+
+    let first_b = last_a + 1;
+
+    let mut b_edges = k_graph_edges(first_b, k_b);
+
+    let mut edges = a_edges;
+    edges.append(&mut b_edges);
+
+    for _ in 0..bridges {
+        edges.push((last_a, first_b));
+    }
+
+    Graph::from_edges(edges.into_iter())
+}
+
 fn complete_graph(n: usize) -> Graph<usize> {
     let mut edges = Vec::new();
 
@@ -80,5 +115,45 @@ fn k_3_3() {
 
 #[test]
 fn two_k_4() {
-    let graph = complete_graph(4);
+    let graph = bridged_k_graphs(4, 4, 1);
+
+    println!("{:#?}", &graph.graph);
+
+    let comps = algorithm::find_components(&graph.graph);
+
+    for (ix, comp) in comps.iter().enumerate() {
+        println!("{ix}\t{comp:?}");
+    }
+
+    // two K4 graphs connected by a single bridge consists
+    // of two 3EC components
+    assert_eq!(comps.len(), 2);
+    assert!(comps.iter().all(|comp| comp.len() == 4));
+}
+
+#[test]
+fn two_k_4_parallel() {
+    // two bridges between two K4 graphs is still two 3ECCs
+    let graph = bridged_k_graphs(4, 4, 2);
+
+    println!("{:#?}", &graph.graph);
+    let comps = algorithm::find_components(&graph.graph);
+    for (ix, comp) in comps.iter().enumerate() {
+        println!("{ix}\t{comp:?}");
+    }
+
+    assert_eq!(comps.len(), 2);
+    assert!(comps.iter().all(|comp| comp.len() == 4));
+
+    // however, three parallel edges makes it a single 3ECC
+    let graph = bridged_k_graphs(4, 4, 3);
+
+    println!("{:#?}", &graph.graph);
+    let comps = algorithm::find_components(&graph.graph);
+    for (ix, comp) in comps.iter().enumerate() {
+        println!("{ix}\t{comp:?}");
+    }
+
+    assert_eq!(comps.len(), 1);
+    assert_eq!(comps[0].len(), 8);
 }
